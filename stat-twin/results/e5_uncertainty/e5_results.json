@@ -20,6 +20,7 @@
     "ece": 0.0479
   },
   "conformal": {
-    "error": "conformal_intervals() missing 3 required positional arguments: 'sigma_cal', 'yhat_test', and 'sigma_test'"
+    "coverage": 0.9005,
+    "mean_width": 131.54
   }
 }
