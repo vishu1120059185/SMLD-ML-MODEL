@@ -61,6 +61,6 @@
       "mae_mean": 63.7
     }
   },
-  "folds": 3,
-  "elapsed_seconds": 3.68
+  "folds": 2,
+  "elapsed_seconds": 3.66
 }

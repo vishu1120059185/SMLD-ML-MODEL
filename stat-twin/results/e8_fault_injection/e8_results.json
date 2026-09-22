@@ -1,10 +1,4 @@
 {
-  "fault_types": [
-    "spike",
-    "stuck",
-    "dropout",
-    "noise"
-  ],
   "dq_detection": {
     "spike": {
       "precision": 0.92,

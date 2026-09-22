@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-22T04:54:29.975765+00:00",
+  "timestamp": "2026-09-22T04:52:37.261537+00:00",
   "git_hash": "3458f0e",
   "git_dirty": true,
   "config_file": "C:\\Users\\AIML-DL-18\\Desktop\\AIML - 99\\SMLD ML MODEL\\stat-twin\\configs\\base.yaml",
@@ -156,5 +156,5 @@
       "far_budget": 0.05
     }
   },
-  "experiment": "e0_data_audit"
+  "experiment": "e2_model_comparison"
 }

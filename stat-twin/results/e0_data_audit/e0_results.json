@@ -2,60 +2,9 @@
   "n_units": 100,
   "n_rows": 20631,
   "n_sensors": 21,
-  "columns": [
-    "unit_id",
-    "cycle",
-    "op_setting_1",
-    "op_setting_2",
-    "op_setting_3",
-    "sensor_1",
-    "sensor_2",
-    "sensor_3",
-    "sensor_4",
-    "sensor_5",
-    "sensor_6",
-    "sensor_7",
-    "sensor_8",
-    "sensor_9",
-    "sensor_10",
-    "sensor_11",
-    "sensor_12",
-    "sensor_13",
-    "sensor_14",
-    "sensor_15",
-    "sensor_16",
-    "sensor_17",
-    "sensor_18",
-    "sensor_19",
-    "sensor_20",
-    "sensor_21",
-    "RUL",
-    "fail_h10",
-    "fail_h20",
-    "fail_h30",
-    "fail_h40",
-    "fail_h50"
-  ],
-  "sensor_stats": {
-    "sensor_1": {
-      "mean": 518.67,
-      "std": 0.0
-    },
-    "sensor_2": {
-      "mean": 642.6809335466046,
-      "std": 0.5000532700606232
-    },
-    "sensor_3": {
-      "mean": 1590.5231186079204,
-      "std": 6.131149519690819
-    },
-    "sensor_4": {
-      "mean": 1408.9337816877514,
-      "std": 9.000604780543714
-    },
-    "sensor_5": {
-      "mean": 14.620000000000001,
-      "std": 1.776399891637612e-15
-    }
+  "unit_cycle_stats": {
+    "min_cycles": 1,
+    "max_cycles": 362,
+    "mean_cycles": 206.31
   }
 }
