@@ -1,3 +1,4 @@
+README.md
 pyproject.toml
 src/stattwin/__init__.py
 src/stattwin/cli.py
@@ -18,14 +19,15 @@ src/stattwin/dashboard/app.py
 src/stattwin/dashboard/components/__init__.py
 src/stattwin/dashboard/components/cards.py
 src/stattwin/dashboard/components/charts.py
-src/stattwin/dashboard/pages/1_overview.py
-src/stattwin/dashboard/pages/2_sensors.py
-src/stattwin/dashboard/pages/3_health.py
-src/stattwin/dashboard/pages/4_forecast.py
-src/stattwin/dashboard/pages/5_explain.py
-src/stattwin/dashboard/pages/6_whatif.py
-src/stattwin/dashboard/pages/7_comparison.py
-src/stattwin/dashboard/pages/__init__.py
+src/stattwin/dashboard/components/live.py
+src/stattwin/dashboard/views/1_overview.py
+src/stattwin/dashboard/views/2_sensors.py
+src/stattwin/dashboard/views/3_health.py
+src/stattwin/dashboard/views/4_forecast.py
+src/stattwin/dashboard/views/5_explain.py
+src/stattwin/dashboard/views/6_whatif.py
+src/stattwin/dashboard/views/7_comparison.py
+src/stattwin/dashboard/views/__init__.py
 src/stattwin/data/__init__.py
 src/stattwin/data/datasets.py
 src/stattwin/data/loader.py
@@ -87,6 +89,7 @@ src/stattwin/uncertainty/__init__.py
 src/stattwin/uncertainty/calibration.py
 src/stattwin/uncertainty/conformal.py
 tests/test_counterfactual.py
+tests/test_dashboard.py
 tests/test_data.py
 tests/test_evaluation.py
 tests/test_explainability.py
