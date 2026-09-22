@@ -14,7 +14,6 @@ from stattwin.dashboard.components.live import (
     live_jitter,
     live_scalar,
     live_series,
-    live_status,
     live_wave,
     live_window,
     rul_countdown,
