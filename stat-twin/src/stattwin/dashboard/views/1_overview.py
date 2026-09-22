@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import numpy as np
 import streamlit as st
 
 from stattwin.dashboard.components.cards import (
+    freshness_indicator,
     kpi_card,
+    progress_card,
     recommendation_card,
     section_header,
     state_badge,
@@ -27,6 +30,9 @@ from stattwin.dashboard.components.live import (
 )
 
 RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
+
+# Timestamp of last artifact load for freshness tracking
+_last_load_key = "_overview_last_load"
 
 
 def _load(name: str, machine: str | None = None):
@@ -93,6 +99,7 @@ def render() -> None:
                 f"{shi:.3f}",
                 delta=f"live · tick #{tick}",
                 provenance=prov,
+                tooltip="Statistical Health Index: 0 (healthy) to 1 (degraded)",
             )
         with col3:
             kpi_card(
@@ -100,6 +107,7 @@ def render() -> None:
                 f"{fp:.1%}",
                 delta="live · simulated stream",
                 provenance="PREDICTED",
+                tooltip="Probability of failure within the next 30 cycles",
             )
         with col4:
             ci_str = (
@@ -112,6 +120,7 @@ def render() -> None:
                 f"{rul:.1f} {ci_str}".strip(),
                 delta="counting down · live",
                 provenance="PREDICTED",
+                tooltip="Remaining Useful Life: predicted cycles until failure",
             )
 
         left, right = st.columns([1, 2])
@@ -165,13 +174,29 @@ def render() -> None:
         if dq:
             col_a, col_b, col_c, col_d = st.columns(4)
             with col_a:
-                kpi_card("Completeness", f"{dq.get('completeness', 0):.1%}")
+                kpi_card(
+                    "Completeness",
+                    f"{dq.get('completeness', 0):.1%}",
+                    tooltip="Fraction of expected sensor readings present",
+                )
             with col_b:
-                kpi_card("Timeliness", f"{dq.get('timeliness', 0):.1%}")
+                kpi_card(
+                    "Timeliness",
+                    f"{dq.get('timeliness', 0):.1%}",
+                    tooltip="Freshness of data relative to expected update cadence",
+                )
             with col_c:
-                kpi_card("Plausibility", f"{dq.get('plausibility', 0):.1%}")
+                kpi_card(
+                    "Plausibility",
+                    f"{dq.get('plausibility', 0):.1%}",
+                    tooltip="Fraction of values within physically plausible ranges",
+                )
             with col_d:
-                kpi_card("Overall DQ", f"{dq.get('overall', 0):.1%}")
+                kpi_card(
+                    "Overall DQ",
+                    f"{dq.get('overall', 0):.1%}",
+                    tooltip="Composite data quality score across all dimensions",
+                )
         else:
             st.info("Data-quality metrics not available in results/.")
 
@@ -192,6 +217,14 @@ def render() -> None:
                 priority="low",
                 provenance="OBSERVED",
             )
+
+        section_header("RUL Health")
+        progress_card(
+            "Remaining Useful Life",
+            rul,
+            maximum=rul_base if rul_base > 0 else 100.0,
+            suffix=" days",
+        )
 
         section_header("SHI Over Time")
         if timeline_data and timeline_data.get("shi"):

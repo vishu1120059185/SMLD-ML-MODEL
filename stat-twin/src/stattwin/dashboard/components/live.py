@@ -61,7 +61,7 @@ def state_from_shi(shi: float) -> str:
 
 
 def live_status(scope: str, *, feed: str = DEFAULT_FEED) -> None:
-    """Render the LIVE badge and the refresh ticker.
+    """Render the LIVE badge, freshness indicator, and the refresh ticker.
 
     Call this *inside* the ``@st.fragment(run_every="2s")`` body so the
     "Updated X.Xs ago" text re-renders on every fragment rerun.  *scope*
@@ -73,6 +73,7 @@ def live_status(scope: str, *, feed: str = DEFAULT_FEED) -> None:
     st.session_state[key] = now
     age = 0.0 if previous is None else max(0.0, now - float(previous))
     tick = current_tick()
+    freshness = freshness_badge(age)
 
     st.markdown(
         f"""
@@ -86,8 +87,11 @@ def live_status(scope: str, *, feed: str = DEFAULT_FEED) -> None:
                      animation:stattwin-blink 1.2s ease-in-out infinite;"></span>
         LIVE · AUTO-REFRESH {LIVE_INTERVAL}
     </span>
-    <span style="color:{MUTED};font-family:'JetBrains Mono',monospace;font-size:0.7rem;">
-        Updated {age:.1f}s ago · tick #{tick}
+    <span style="display:flex;align-items:center;gap:12px;">
+        {freshness}
+        <span style="color:{MUTED};font-family:'JetBrains Mono',monospace;font-size:0.7rem;">
+            tick #{tick}
+        </span>
     </span>
     <span style="color:{MUTED};font-size:0.68rem;">{feed}</span>
 </div>
@@ -238,3 +242,43 @@ def rul_countdown(
     floor = max(1.0, base * 0.05)
     elapsed = (tick % int(cycle)) * float(per_tick)
     return float(max(floor, base - elapsed))
+
+
+def freshness_badge(updated_seconds_ago: float | None = None) -> str:
+    """Return an HTML freshness indicator with pulsing dot.
+
+    Args:
+        updated_seconds_ago: Seconds since last data update. None = live.
+    """
+    if updated_seconds_ago is None or updated_seconds_ago < 5:
+        dot_cls = "st-freshness-dot st-freshness-ok"
+        label = "Live"
+    elif updated_seconds_ago < 30:
+        dot_cls = "st-freshness-dot st-freshness-ok"
+        label = f"{updated_seconds_ago:.0f}s ago"
+    elif updated_seconds_ago < 300:
+        dot_cls = "st-freshness-dot st-freshness-stale"
+        label = f"{updated_seconds_ago:.0f}s ago (stale)"
+    else:
+        dot_cls = "st-freshness-dot st-freshness-stale"
+        label = f"{updated_seconds_ago / 60:.1f}m ago (stale)"
+    return (
+        f'<span class="st-freshness"><span class="{dot_cls}"></span>{label}</span>'
+    )
+
+
+def stale_data_warning(message: str = "Data may be outdated") -> None:
+    """Render a stale data warning banner."""
+    st.markdown(
+        f"""
+        <div style="
+            background:rgba(245,158,11,0.10); border:1px solid #F59E0B;
+            border-radius:8px; padding:8px 14px; margin-bottom:10px;
+            color:#FCD34D; font-size:0.78rem; font-weight:600;
+            letter-spacing:0.3px; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.9rem;">⏳</span>
+            {message}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )

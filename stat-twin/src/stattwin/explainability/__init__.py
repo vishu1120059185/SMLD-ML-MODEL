@@ -31,7 +31,6 @@ __all__ = [
     "build_evidence_cards",
     "group_occlusion_attribution",
     "risk_change_decomposition",
-    "severity_bins_default",
     "severity_label",
     "shap_attribution",
 ]

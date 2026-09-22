@@ -63,7 +63,7 @@ def _get_package_versions() -> dict[str, str]:
         "torch",
         "streamlit",
         "pydantic",
-        "pydantic_yaml",
+        "pydantic",
         "typer",
         "plotly",
         "shap",
@@ -75,7 +75,7 @@ def _get_package_versions() -> dict[str, str]:
         try:
             import importlib
 
-            mod = importlib.import_module(pkg if pkg != "pydantic_yaml" else "pydantic_yaml")
+            mod = importlib.import_module(pkg)
             ver = getattr(mod, "__version__", "unknown")
             if ver == "unknown":
                 try:

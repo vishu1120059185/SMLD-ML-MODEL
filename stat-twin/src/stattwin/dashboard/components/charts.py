@@ -1,4 +1,8 @@
-"""Shared Plotly chart components with dark industrial theme."""
+"""Shared Plotly chart components with dark industrial theme.
+
+Enhanced with responsive sizing, unified hover, consistent theming,
+and provenance badge support for chart titles.
+"""
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -12,18 +16,21 @@ PAPER = "#111827"
 GRID = "#1F2937"
 TEXT = "#F9FAFB"
 ACCENT = "#3B82F6"
+SUCCESS = "#10B981"
+WARNING = "#F59E0B"
+DANGER = "#EF4444"
 
 STATE_COLORS = {
-    "HEALTHY": "#10B981",
-    "WATCH": "#F59E0B",
+    "HEALTHY": SUCCESS,
+    "WATCH": WARNING,
     "DEGRADING": "#F97316",
-    "CRITICAL": "#EF4444",
+    "CRITICAL": DANGER,
     "FAILURE-LIKELY": "#991B1B",
 }
 
 PROVENANCE_COLORS = {
-    "OBSERVED": "#3B82F6",
-    "PREDICTED": "#F59E0B",
+    "OBSERVED": ACCENT,
+    "PREDICTED": WARNING,
     "SIMULATED": "#8B5CF6",
 }
 
@@ -46,6 +53,12 @@ def _layout(title: str = "", height: int = 400) -> dict:
         xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),
         yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),
         legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
+        hovermode="x unified",
+        hoverlabel=dict(
+            bgcolor=PAPER,
+            bordercolor=GRID,
+            font=dict(color=TEXT, family="JetBrains Mono, Fira Code, monospace", size=12),
+        ),
     )
 
 
@@ -58,6 +71,7 @@ def timeline_chart(
     bands: list[dict] | None = None,
     extra_traces: list[go.Scatter] | None = None,
     state_changes: list[dict] | None = None,
+    provenance: str | None = None,
 ) -> go.Figure:
     """Line chart with optional rolling bands and state-change shading."""
     fig = go.Figure()
@@ -102,6 +116,10 @@ def timeline_chart(
                 annotation_font_size=9,
             )
 
+    if provenance:
+        prov_color = PROVENANCE_COLORS.get(provenance, TEXT)
+        title = f"{title}  <span style='color:{prov_color};font-size:11px;'>[{provenance}]</span>"
+
     layout = _layout(title, height=380)
     layout["yaxis"]["title"] = y_label
     fig.update_layout(**layout)
@@ -109,7 +127,7 @@ def timeline_chart(
 
 
 def gauge_chart(value: float, title: str = "SHI", max_val: float = 1.0) -> go.Figure:
-    """Semi-circular gauge."""
+    """Semi-circular gauge with color-coded thresholds."""
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=value,
@@ -241,4 +259,34 @@ def sparkline(values: Sequence[float], *, height: int = 80, color: str = ACCENT)
         yaxis=dict(visible=False),
         showlegend=False,
     )
+    return fig
+
+
+def forest_plot(
+    labels: list[str],
+    means: list[float],
+    ci_lo: list[float],
+    ci_hi: list[float],
+    *,
+    title: str = "Effect Size Forest Plot",
+    zero_line: float = 0.0,
+) -> go.Figure:
+    """Forest plot for ablation effect sizes with confidence intervals."""
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=means, y=labels,
+        error_x=dict(
+            type="data",
+            symmetric=False,
+            array=[hi - m for m, hi in zip(means, ci_hi)],
+            arrayminus=[m - lo for m, lo in zip(means, ci_lo)],
+        ),
+        mode="markers",
+        marker=dict(color=ACCENT, size=10),
+        name="Effect size",
+    ))
+    fig.add_vline(x=zero_line, line_dash="dash", line_color=GRID, line_width=1)
+    layout = _layout(title, height=max(200, len(labels) * 40 + 100))
+    layout["xaxis"]["title"] = "Effect size (95% CI)"
+    fig.update_layout(**layout)
     return fig

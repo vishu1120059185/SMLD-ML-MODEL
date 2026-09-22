@@ -329,6 +329,109 @@ details summary { color: var(--text) !important; font-weight: 600 !important; }
 
 /* ── Divider used by section headers ────────────────────────────────────── */
 section[data-testid="stSidebar"] hr { border-color: var(--border) !important; }
+
+/* ── Accessibility: keyboard focus outlines ──────────────────────────────── */
+*:focus-visible {
+    outline: 2px solid var(--accent) !important;
+    outline-offset: 2px !important;
+}
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--accent) !important;
+    outline-offset: 2px !important;
+}
+
+/* ── Accessibility: reduce motion for users who prefer it ────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    .dot-ok, .dot-warn { box-shadow: none !important; }
+}
+
+/* ── Tooltips for KPI labels and badges ──────────────────────────────────── */
+.st-tooltip-wrapper {
+    position: relative; display: inline-block; cursor: help;
+}
+.st-tooltip-wrapper .st-tooltip-text {
+    visibility: hidden; opacity: 0;
+    position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%);
+    background: #1F2937; color: var(--text); font-size: 0.72rem;
+    padding: 6px 10px; border-radius: 6px; white-space: nowrap;
+    border: 1px solid var(--border); box-shadow: var(--shadow);
+    z-index: 999; transition: opacity 0.15s ease;
+    pointer-events: none; font-weight: 500;
+}
+.st-tooltip-wrapper .st-tooltip-text::after {
+    content: ""; position: absolute; top: 100%; left: 50%;
+    margin-left: -5px; border-width: 5px;
+    border-style: solid; border-color: #1F2937 transparent transparent transparent;
+}
+.st-tooltip-wrapper:hover .st-tooltip-text { visibility: visible; opacity: 1; }
+
+/* ── Provenance badge variants ───────────────────────────────────────────── */
+.prov-observed  { border: 1px solid rgba(59,130,246,0.6); }
+.prov-predicted { border: 1px dashed rgba(245,158,11,0.6); }
+.prov-simulated { border: 1px dotted rgba(139,92,246,0.6); }
+
+/* ── Data freshness indicator ────────────────────────────────────────────── */
+.st-freshness {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.68rem; color: var(--muted); font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.3px;
+}
+.st-freshness-dot {
+    width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+    animation: pulse 2s infinite;
+}
+.st-freshness-ok { background: var(--success); }
+.st-freshness-stale { background: var(--warning); animation: none; }
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* ── Responsive breakpoints ──────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+    .block-container { max-width: 100%; padding: 1rem; }
+    .st-hero-title { font-size: 1.4rem; letter-spacing: 2px; }
+}
+@media (max-width: 768px) {
+    .block-container { padding: 0.8rem; }
+    .st-hero { padding: 12px 16px; margin-bottom: 0.8rem; }
+    .st-hero-title { font-size: 1.1rem; letter-spacing: 1px; }
+    .st-hero-sub { font-size: 0.65rem; letter-spacing: 1.5px; }
+    .st-hero-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+    [data-testid="stMetric"] { padding: 10px 14px !important; }
+    [data-testid="stMetric"] [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
+    section[data-testid="stSidebar"] {
+        position: fixed; top: 0; left: 0; height: 100vh; z-index: 999;
+    }
+}
+
+/* ── Loading skeleton for async data ─────────────────────────────────────── */
+.st-skeleton {
+    background: linear-gradient(90deg, var(--card) 25%, #1a2236 50%, var(--card) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px; height: 60px;
+}
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+/* ── Alert card severity strip ───────────────────────────────────────────── */
+.st-alert-strip {
+    border-left: 3px solid; padding-left: 12px; margin-bottom: 8px;
+}
+
+/* ── Comparison arrow ────────────────────────────────────────────────────── */
+.st-compare-arrow {
+    color: var(--muted); font-size: 1.1rem; display: inline-block;
+    margin: 0 6px; vertical-align: middle;
+}
 </style>
 """,
     unsafe_allow_html=True,
