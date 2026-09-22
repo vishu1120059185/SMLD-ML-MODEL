@@ -432,6 +432,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     color: var(--muted); font-size: 1.1rem; display: inline-block;
     margin: 0 6px; vertical-align: middle;
 }
+
+/* ── Live status blinking dot (global, persists across fragment reruns) ──── */
+@keyframes stattwin-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.15; }
+}
+.st-live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--danger); display: inline-block;
+    box-shadow: 0 0 8px var(--danger);
+    animation: stattwin-blink 1.2s ease-in-out infinite;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -535,6 +547,8 @@ st.sidebar.markdown(
 )
 
 # ── Hero header (main area) ─────────────────────────────────────────────────
+import time as _time
+_hero_tick = int(_time.time() * 1000) // 2000
 st.markdown(
     f"""
     <div class="st-hero">
@@ -547,6 +561,8 @@ st.markdown(
             <div class="st-hero-meta">
                 <span class="st-pill st-pill-accent">{selected_page.split('  ')[-1]}</span>
                 <span class="st-pill st-pill-success">● {selected_machine}</span>
+                <span class="st-pill" style="background:rgba(239,68,68,0.12);color:#FCA5A5;
+                    border-color:rgba(239,68,68,0.4);"> ticking #{_hero_tick}</span>
             </div>
         </div>
     </div>

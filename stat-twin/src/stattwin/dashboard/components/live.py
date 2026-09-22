@@ -77,27 +77,17 @@ def live_status(scope: str, *, feed: str = DEFAULT_FEED) -> None:
 
     st.markdown(
         f"""
-<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;
-            flex-wrap:wrap;background:{CARD_BG};border:1px solid {BORDER};
-            border-radius:8px;padding:7px 14px;margin-bottom:10px;">
-    <span style="display:inline-flex;align-items:center;gap:7px;color:{DANGER};
-                 font-size:0.72rem;font-weight:800;letter-spacing:1.4px;">
-        <span style="width:8px;height:8px;border-radius:50%;background:{DANGER};
-                     box-shadow:0 0 8px {DANGER};display:inline-block;
-                     animation:stattwin-blink 1.2s ease-in-out infinite;"></span>
+<div class="st-live-bar">
+    <span class="st-live-label">
+        <span class="st-live-dot"></span>
         LIVE · AUTO-REFRESH {LIVE_INTERVAL}
     </span>
     <span style="display:flex;align-items:center;gap:12px;">
         {freshness}
-        <span style="color:{MUTED};font-family:'JetBrains Mono',monospace;font-size:0.7rem;">
-            tick #{tick}
-        </span>
+        <span class="st-live-meta">tick #{tick}</span>
     </span>
-    <span style="color:{MUTED};font-size:0.68rem;">{feed}</span>
+    <span class="st-live-feed">{feed}</span>
 </div>
-<style>
-@keyframes stattwin-blink {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0.2; }} }}
-</style>
 """,
         unsafe_allow_html=True,
     )
