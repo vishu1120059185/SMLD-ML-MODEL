@@ -4,12 +4,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import numpy as np
 import streamlit as st
-import plotly.graph_objects as go
 
-from stattwin.dashboard.components.charts import bar_chart, sparkline, multi_line_chart
-from stattwin.dashboard.components.cards import evidence_card, section_header, provenance_badge
+from stattwin.dashboard.components.cards import evidence_card, provenance_badge, section_header
+from stattwin.dashboard.components.charts import bar_chart, sparkline
 
 RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
 

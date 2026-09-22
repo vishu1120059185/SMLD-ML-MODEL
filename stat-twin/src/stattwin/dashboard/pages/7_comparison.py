@@ -1,15 +1,15 @@
-"""Page 7 — MODEL COMPARISON: Metrics, Early Warning, Ablation, Calibration, Intervals, Generalization."""
+"""Page 7 — MODEL COMPARISON: Metrics, Early Warning, Ablation, Calibration, Intervals."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
 import numpy as np
-import streamlit as st
 import plotly.graph_objects as go
+import streamlit as st
 
-from stattwin.dashboard.components.charts import bar_chart, heatmap_chart, multi_line_chart
-from stattwin.dashboard.components.cards import kpi_card, section_header, provenance_badge
+from stattwin.dashboard.components.cards import kpi_card, provenance_badge, section_header
+from stattwin.dashboard.components.charts import bar_chart
 
 RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
 
@@ -182,7 +182,6 @@ def render():
         section_header("Calibration Plot")
         cal = comparison.get("calibration", {})
         if cal:
-            bin_edges = cal.get("bin_edges", [])
             predicted = cal.get("predicted", [])
             observed = cal.get("observed", [])
 

@@ -5,11 +5,11 @@ import json
 from pathlib import Path
 
 import numpy as np
-import streamlit as st
 import plotly.graph_objects as go
+import streamlit as st
 
-from stattwin.dashboard.components.charts import timeline_chart, multi_line_chart, gauge_chart
 from stattwin.dashboard.components.cards import kpi_card, provenance_badge, section_header
+from stattwin.dashboard.components.charts import gauge_chart, multi_line_chart, timeline_chart
 
 RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
 
@@ -78,7 +78,9 @@ def render():
             "name": "P(failure)",
             "color": "#D64545",
         }]
-        fig = multi_line_chart(traces, title="P(Failure) by Forecast Horizon", y_label="Probability")
+        fig = multi_line_chart(
+            traces, title="P(Failure) by Forecast Horizon", y_label="Probability",
+        )
         # Conformal band overlay
         if conformal and "upper" in conformal and "lower" in conformal:
             fig.add_trace(go.Scatter(
@@ -221,6 +223,6 @@ def _demo_forecast() -> dict:
         "rul": 42,
         "rul_ci": [28, 58],
         "model": "ensemble (demo)",
-        "horizon_probs": {str(h): p for h, p in zip(horizons, probs)},
+        "horizon_probs": {str(h): p for h, p in zip(horizons, probs, strict=False)},
         "timestamps": list(range(len(horizons))),
     }

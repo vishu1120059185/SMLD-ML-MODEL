@@ -5,11 +5,11 @@ import json
 from pathlib import Path
 
 import numpy as np
-import streamlit as st
 import plotly.graph_objects as go
+import streamlit as st
 
-from stattwin.dashboard.components.charts import timeline_chart, sparkline
 from stattwin.dashboard.components.cards import kpi_card, provenance_badge, section_header
+from stattwin.dashboard.components.charts import sparkline, timeline_chart
 
 RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
 
@@ -113,11 +113,11 @@ def render():
         col_chart, col_z = st.columns([3, 1])
 
         with col_chart:
-            bands = [{"upper": upper, "lower": lower, "label": f"±2σ ({window})", "fill": "rgba(76,139,245,0.10)"}]
-            ewma_trace = {
-                "x": list(timestamps), "y": ewma.tolist(),
-                "name": "EWMA", "color": "#F5A623", "dash": "dot",
-            }
+            bands = [{
+                "upper": upper, "lower": lower,
+                "label": f"±2σ ({window})",
+                "fill": "rgba(59,130,246,0.10)",
+            }]
             fig = timeline_chart(
                 timestamps, values.tolist(),
                 title=f"{sname} — Raw + Rolling + EWMA",

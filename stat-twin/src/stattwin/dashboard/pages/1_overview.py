@@ -4,17 +4,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import numpy as np
 import streamlit as st
 
-from stattwin.dashboard.components.charts import gauge_chart, timeline_chart, bar_chart
 from stattwin.dashboard.components.cards import (
     kpi_card,
-    state_badge,
-    evidence_card,
     recommendation_card,
     section_header,
+    state_badge,
 )
+from stattwin.dashboard.components.charts import gauge_chart, timeline_chart
 
 RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
 

@@ -6,10 +6,9 @@ from pathlib import Path
 
 import numpy as np
 import streamlit as st
-import plotly.graph_objects as go
 
-from stattwin.dashboard.components.charts import timeline_chart, heatmap_chart, bar_chart
-from stattwin.dashboard.components.cards import kpi_card, state_badge, section_header
+from stattwin.dashboard.components.cards import kpi_card, section_header, state_badge
+from stattwin.dashboard.components.charts import heatmap_chart, timeline_chart
 
 RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
 

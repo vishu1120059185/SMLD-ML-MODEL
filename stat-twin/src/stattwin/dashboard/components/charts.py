@@ -1,9 +1,10 @@
 """Shared Plotly chart components with dark industrial theme."""
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import numpy as np
 import plotly.graph_objects as go
-from typing import Sequence
 
 # ── Colour palette (matches app.py industrial dark theme) ──────────────────
 BG = "#0A0E17"

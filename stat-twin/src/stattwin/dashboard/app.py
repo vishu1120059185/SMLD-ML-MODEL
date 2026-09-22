@@ -253,7 +253,10 @@ input, textarea {
     color: var(--text) !important;
     background-color: var(--card) !important;
 }
-div[data-baseweb="input"] { background-color: var(--card) !important; border-color: var(--border) !important; }
+div[data-baseweb="input"] {
+    background-color: var(--card) !important;
+    border-color: var(--border) !important;
+}
 div[data-baseweb="base-button-above"] > button,
 .stButton > button {
     background: linear-gradient(180deg, #1D4ED8, #1E40AF) !important;
@@ -262,7 +265,11 @@ div[data-baseweb="base-button-above"] > button,
     letter-spacing: 0.4px; transition: filter 0.15s ease, transform 0.1s ease;
     box-shadow: var(--shadow);
 }
-.stButton > button:hover { filter: brightness(1.15); border-color: #3B82F6 !important; color: #FFF !important; }
+.stButton > button:hover {
+    filter: brightness(1.15);
+    border-color: #3B82F6 !important;
+    color: #FFF !important;
+}
 .stButton > button:active { transform: translateY(1px); }
 
 /* Sliders */
@@ -282,15 +289,30 @@ div[data-testid="stAlert"] > div { color: var(--text) !important; }
 [data-testid="stNotification"] { background: var(--card); border-color: var(--border); }
 
 /* ── Expander / popover ─────────────────────────────────────────────────── */
-details { border: 1px solid var(--border) !important; background: var(--card) !important; border-radius: 10px !important; }
+details {
+    border: 1px solid var(--border) !important;
+    background: var(--card) !important;
+    border-radius: 10px !important;
+}
 details summary { color: var(--text) !important; font-weight: 600 !important; }
-[data-testid="stExpander"] { background: var(--card) !important; border-color: var(--border) !important; border-radius: 10px !important; }
+[data-testid="stExpander"] {
+    background: var(--card) !important;
+    border-color: var(--border) !important;
+    border-radius: 10px !important;
+}
 [data-testid="stExpander"] summary { color: var(--text) !important; }
 
 /* ── Dataframe / table ──────────────────────────────────────────────────── */
-[data-testid="stDataFrame"] { border-color: var(--border) !important; border-radius: 10px !important; overflow: hidden; }
-[data-testid="stStyledTable"] thead tr th { background-color: var(--card) !important; color: var(--muted) !important;
-    text-transform: uppercase; letter-spacing: 0.8px; font-size: 0.72rem; }
+[data-testid="stDataFrame"] {
+    border-color: var(--border) !important;
+    border-radius: 10px !important;
+    overflow: hidden;
+}
+[data-testid="stStyledTable"] thead tr th {
+    background-color: var(--card) !important;
+    color: var(--muted) !important;
+    text-transform: uppercase; letter-spacing: 0.8px; font-size: 0.72rem;
+}
 [data-testid="stStyledTable"] tbody tr { background-color: var(--bg) !important; }
 [data-testid="stStyledTable"] tbody tr:hover { background-color: var(--card) !important; }
 [data-testid="stStyledTable"] tbody td { color: var(--text) !important;
@@ -343,14 +365,13 @@ if meta_file.exists():
     except Exception:
         pass
 
-if not available_machines:
+if not available_machines and RESULTS_DIR.is_dir():
     # Fallback: scan results/ for machine sub-directories (skip stage dirs e0_…, global)
-    if RESULTS_DIR.is_dir():
-        available_machines = sorted(
-            d.name
-            for d in RESULTS_DIR.iterdir()
-            if d.is_dir() and d.name != "global" and not re.match(r"^e\d+_", d.name)
-        )
+    available_machines = sorted(
+        d.name
+        for d in RESULTS_DIR.iterdir()
+        if d.is_dir() and d.name != "global" and not re.match(r"^e\d+_", d.name)
+    )
 
 if not available_machines:
     available_machines = ["MACHINE-001"]
@@ -370,7 +391,8 @@ if RESULTS_DIR.is_dir():
     if n_stage:
         status_html = (
             f'<div class="side-status"><span class="dot dot-ok"></span>'
-            f'<span>Artifacts linked · <b style="color:#F9FAFB;">{n_stage}</b> result sets</span></div>'
+            f'<span>Artifacts linked · <b style="color:#F9FAFB;">{n_stage}</b>'
+            f' result sets</span></div>'
         )
     else:
         status_html = (
@@ -416,7 +438,8 @@ st.markdown(
         <div class="st-hero-row">
             <div>
                 <div class="st-hero-title">STAT-TWIN</div>
-                <div class="st-hero-sub">Predictive Maintenance · Statistical Health · Failure Forecast</div>
+                <div class="st-hero-sub">Predictive Maintenance · Statistical
+                    Health · Failure Forecast</div>
             </div>
             <div class="st-hero-meta">
                 <span class="st-pill st-pill-accent">{selected_page.split('  ')[-1]}</span>
