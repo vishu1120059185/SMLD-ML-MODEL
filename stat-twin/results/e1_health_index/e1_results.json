@@ -4,23 +4,12 @@
     70.93901282761081
   ],
   "quality_metrics": {
-    "monotonicity_mean": 1.0,
-    "monotonicity_std": 0.0,
-    "trendability": 1.0,
-    "prognosability": 2.311285224737085,
-    "spearman_rho_mean": 0.8251653265070407,
-    "spearman_rho_std": 0.053425951960183876
+    "monotonicity_mean": "1.0",
+    "monotonicity_std": "0.0",
+    "trendability": "1.0",
+    "prognosability": "2.311285224737085",
+    "spearman_rho_mean": "0.8251653265070407",
+    "spearman_rho_std": "0.053425951960183876"
   },
-  "threshold_sensitivity": [
-    {
-      "grid": [
-        80,
-        60,
-        40,
-        20
-      ],
-      "note": "default fixed grid"
-    }
-  ],
-  "elapsed_seconds": 0.0
+  "elapsed_seconds": 20.74
 }
