@@ -24,10 +24,9 @@ Rules are configurable and should be calibrated on validation data.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 __all__ = [
@@ -41,7 +40,7 @@ __all__ = [
 # Risk tier enum
 # ---------------------------------------------------------------------------
 
-class RiskTier(str, Enum):
+class RiskTier(StrEnum):
     """Ordered risk tiers (lower = safer)."""
 
     LOW = "Low"
@@ -286,7 +285,6 @@ def generate_maintenance_guidance(
         horizons = sorted(horizons)
 
     # Extract P(+30) or nearest available horizon
-    target_horizon = 30
     horizon_used = 30
     if 30 in horizons:
         horizon_used = 30
@@ -297,10 +295,11 @@ def generate_maintenance_guidance(
         horizon_used = 30
 
     label_col = f"fail_h{horizon_used}"
-    if label_col in proba.columns:
-        p30 = float(proba[label_col].iloc[0])
-    else:
-        p30 = 0.0
+    p30 = (
+        float(proba[label_col].iloc[0])
+        if label_col in proba.columns
+        else 0.0
+    )
 
     # --- Tier assignment ---
     tier = RiskTier.LOW

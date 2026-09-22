@@ -1,0 +1,62 @@
+{# STAT-TWIN Research Report Template (Jinja2) #}
+{# Usage: render with generate.py or standalone Jinja2 #}
+
+# STAT-TWIN Research Report
+
+**Dataset:** {{ dataset | default("N/A") }}
+**Generated:** {{ timestamp | default("N/A") }}
+**Config hash:** {{ config_hash | default("N/A") }}
+
+---
+
+## Executive Summary
+
+{% if summary %}
+{{ summary }}
+{% else %}
+_Auto-generated from experiment results. See per-experiment sections below._
+{% endif %}
+
+---
+
+{% for exp in experiments %}
+## {{ exp.name }}: {{ exp.title }}
+
+{{ exp.description }}
+
+{% if exp.table %}
+{{ exp.table }}
+{% endif %}
+
+{% if exp.figures %}
+### Figures
+
+{% for fig in exp.figures %}
+![{{ fig.caption }}]({{ fig.path }})
+{% endfor %}
+{% endif %}
+
+{% if exp.key_findings %}
+### Key Findings
+
+{% for finding in exp.key_findings %}
+- {{ finding }}
+{% endfor %}
+{% endif %}
+
+---
+
+{% endfor %}
+
+## Appendix: Configuration
+
+| Parameter | Value |
+|-----------|-------|
+{% for key, value in config_items.items() %}
+| {{ key }} | {{ value }} |
+{% endfor %}
+
+---
+
+_Report generated automatically by STAT-TWIN report generator._
+_Do not hand-edit values; re-run experiments and regenerate._

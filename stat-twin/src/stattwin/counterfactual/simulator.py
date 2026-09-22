@@ -189,7 +189,11 @@ class SimulationResult:
             "shi_delta": self.shi_delta,
             "original_state": self.original_state,
             "simulated_state": self.simulated_state,
-            "proba_delta_max": float(self.proba_delta.values.max()) if not self.proba_delta.empty else 0.0,
+            "proba_delta_max": (
+                float(self.proba_delta.values.max())
+                if not self.proba_delta.empty
+                else 0.0
+            ),
             "largest_changes": self.largest_changes,
             "ood_warning": self.ood_warning,
             "identity_verified": self.identity_verified,
@@ -227,7 +231,6 @@ def _check_ood(
     n_sensors = len(baseline_mean)
 
     for i in range(n_sensors):
-        orig = original_vals[:, i] if original_vals.ndim > 1 else original_vals
         pert = perturbed_vals[:, i] if perturbed_vals.ndim > 1 else perturbed_vals
 
         # Compute PSI
@@ -441,7 +444,6 @@ class WhatIfSimulator:
         state_orig = self._classify_state(shi_orig)
 
         # --- Apply perturbation ---
-        perturbed_data = unit_data.copy()
         perturbed_sensors = list(sensor_perturbations.keys())
         all_perturbed = unit_data.copy()
 
@@ -474,10 +476,11 @@ class WhatIfSimulator:
         else:
             sim_features = sim_row
 
-        if self.feature_cols:
-            model_input_sim = sim_features[self.feature_cols]
-        else:
-            model_input_sim = sim_features
+        model_input_sim = (
+            sim_features[self.feature_cols]
+            if self.feature_cols
+            else sim_features
+        )
 
         proba_sim = self.model.predict_proba(model_input_sim)
         rul_sim_series = self.model.predict_rul(model_input_sim)
@@ -503,9 +506,15 @@ class WhatIfSimulator:
         # OOD check
         ood_warning = ""
         if self._baseline_mean is not None and self._baseline_std is not None:
-            orig_vals = original_features[self.sensor_cols].values if self.sensor_cols else np.zeros((1, 1))
-            sim_vals = sim_features[self.sensor_cols].values if self.sensor_cols else np.zeros((1, 1))
-            n_sensors_avail = min(orig_vals.shape[1], len(self._baseline_mean))
+            if self.sensor_cols:
+                orig_vals = original_features[self.sensor_cols].values
+                sim_vals = sim_features[self.sensor_cols].values
+            else:
+                orig_vals = np.zeros((1, 1))
+                sim_vals = np.zeros((1, 1))
+            n_sensors_avail = min(
+                orig_vals.shape[1], len(self._baseline_mean)
+            )
             if n_sensors_avail > 0:
                 ood_warning = _check_ood(
                     orig_vals[:, :n_sensors_avail],
@@ -580,7 +589,8 @@ class WhatIfSimulator:
         # Check identity
         if not result.proba_delta.empty:
             max_delta = float(np.abs(result.proba_delta.values).max())
-            result.identity_verified = max_delta < (atol + rtol * abs(float(result.original_proba.values.mean())))
+            orig_mean = float(result.original_proba.values.mean())
+            result.identity_verified = max_delta < (atol + rtol * abs(orig_mean))
         else:
             result.identity_verified = True
 
@@ -599,7 +609,10 @@ class WhatIfSimulator:
         # Use cached ECDF params and weights if available
         hi = self.health_index
         if hasattr(hi, "shi_values"):
-            mask = (hi.shi_values[self.unit_col] == unit_id) & (hi.shi_values[self.cycle_col] == cycle)
+            mask = (
+                (hi.shi_values[self.unit_col] == unit_id)
+                & (hi.shi_values[self.cycle_col] == cycle)
+            )
             matched = hi.shi_values[mask]
             if not matched.empty:
                 return float(matched["shi"].iloc[0])
