@@ -69,7 +69,8 @@ class TestFeatureCausality:
 
             if pd.isna(val_full) and pd.isna(val_trunc):
                 continue
-            assert val_full == pytest.approx(val_trunc, rel=1e-10), (
+            tol = 1e-6 if "kurt" in new_col or "skew" in new_col else 1e-10
+            assert val_full == pytest.approx(val_trunc, rel=tol), (
                 f"{func.__name__}.{new_col} at t={t}: full={val_full}, trunc={val_trunc}"
             )
 

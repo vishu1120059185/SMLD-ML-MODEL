@@ -50,8 +50,8 @@ def add_common_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
 
 
 def resolve_raw_path(ds_name: str) -> Path:
-    """Return the expected raw-data file path for a C-MAPSS dataset."""
-    return _PROJECT_ROOT / "data" / "raw" / "CMAPSS" / f"{ds_name.upper()}.txt"
+    """Return the expected train raw-data file path for a C-MAPSS dataset."""
+    return _PROJECT_ROOT / "data" / "raw" / "CMAPSS" / f"train_{ds_name.upper()}.txt"
 
 
 def experiment_setup(args: argparse.Namespace) -> tuple[STATTWINConfig, pd.DataFrame, Path]:

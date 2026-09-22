@@ -69,7 +69,8 @@ class TestMissingValues:
 
     def test_missingness_indicators(self, df_with_nans):
         ind = MissingnessIndicators(columns=["sensor_1", "sensor_2"])
-        result = ind.fit_transform(df_with_nans)
+        ind.fit(df_with_nans)
+        result = ind.transform(df_with_nans)
         assert "sensor_1_missing" in result.columns
         assert "sensor_2_missing" in result.columns
         assert result.loc[1, "sensor_1_missing"] == 1
@@ -97,7 +98,7 @@ class TestOutliers:
         det.fit(clean_df, columns=["sensor_1", "sensor_2"])
         flags = det.detect(clean_df)
         assert flags.shape == clean_df.shape
-        assert flags.dtypes.all() == np.dtype(bool)
+        assert all(flags.dtypes == np.dtype(bool))
 
     def test_iqr_detector_unfitted(self, clean_df):
         det = IQRFencesDetector()

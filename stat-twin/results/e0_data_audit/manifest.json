@@ -1,0 +1,161 @@
+{
+  "timestamp": "2026-09-22T04:17:10.423971+00:00",
+  "git_hash": "218a003",
+  "git_dirty": true,
+  "config_file": "C:\\Users\\AIML-DL-18\\Desktop\\AIML - 99\\SMLD ML MODEL\\stat-twin\\configs\\base.yaml",
+  "config_hash": "439e9e7b699d",
+  "seed": 42,
+  "dataset": "FD001",
+  "profile": null,
+  "python": "3.12.5",
+  "platform": "Windows 11",
+  "package_versions": {
+    "pandas": "2.2.3",
+    "numpy": "2.2.2",
+    "scipy": "1.18.0",
+    "scikit-learn": "not-installed",
+    "xgboost": "3.4.1",
+    "torch": "2.14.0+cpu",
+    "streamlit": "1.64.0",
+    "pydantic": "2.11.7",
+    "pydantic_yaml": "not-installed",
+    "typer": "0.27.2",
+    "plotly": "7.1.0",
+    "shap": "0.52.0",
+    "matplotlib": "3.10.0",
+    "seaborn": "0.13.2"
+  },
+  "config": {
+    "seed": 42,
+    "dataset": {
+      "name": "FD001",
+      "raw_dir": "data/raw/CMAPSS",
+      "rul_clip": 125,
+      "use_age_feature": false
+    },
+    "split": {
+      "scheme": "group_kfold",
+      "n_splits": 3,
+      "group_col": "unit_id"
+    },
+    "preprocess": {
+      "missing": {
+        "strategy": "ffill_then_median",
+        "add_indicators": true
+      },
+      "outliers": {
+        "method": "robust_z",
+        "threshold": 4.0,
+        "action": "flag_and_winsorize"
+      },
+      "scaler": "standard",
+      "per_condition_norm": "auto"
+    },
+    "stats": {
+      "windows": [
+        5,
+        10,
+        20,
+        30
+      ],
+      "ewma_alpha": [
+        0.1,
+        0.3
+      ],
+      "baseline_cycles": 30,
+      "corr": {
+        "methods": [
+          "pearson",
+          "spearman"
+        ],
+        "pairs": "top_k",
+        "top_k": 10
+      },
+      "shift": [
+        "ks",
+        "wasserstein",
+        "psi"
+      ]
+    },
+    "health": {
+      "weights": {
+        "deviation": 0.25,
+        "trend": 0.25,
+        "ewma": 0.2,
+        "variance": 0.15,
+        "corr_shift": 0.15
+      },
+      "calibrate_weights": false,
+      "smoothing": {
+        "method": "ewma",
+        "alpha": 0.2
+      },
+      "states_method": "calibrated"
+    },
+    "states": {
+      "method": "calibrated",
+      "fallback_grid": [
+        80,
+        60,
+        40,
+        20
+      ],
+      "persistence": 3
+    },
+    "forecast": {
+      "horizons": [
+        10,
+        20,
+        30,
+        40,
+        50
+      ],
+      "seq_len": 30,
+      "enforce_monotone": true
+    },
+    "model": {
+      "gru": {
+        "hidden": 64,
+        "layers": 2,
+        "dropout": 0.2,
+        "ensemble_size": 3
+      },
+      "xgb": {
+        "n_estimators": 400,
+        "max_depth": 5,
+        "learning_rate": 0.05
+      },
+      "rf": {
+        "n_estimators": 200,
+        "max_depth": 10
+      },
+      "lr": {
+        "C": 1.0,
+        "max_iter": 1000
+      },
+      "lstm": {
+        "hidden": 64,
+        "layers": 2,
+        "dropout": 0.2,
+        "ensemble_size": 3
+      }
+    },
+    "uncertainty": {
+      "method": "split_conformal",
+      "alpha": 0.1,
+      "normalize_by": "ensemble_std"
+    },
+    "calibration": {
+      "method": "isotonic",
+      "bins": 10
+    },
+    "warning": {
+      "horizon": 30,
+      "persistence": 3,
+      "valid_window": 100,
+      "far_budget": 0.05
+    }
+  },
+  "elapsed_seconds": 0.7354256999997233,
+  "experiment": "e0_data_audit"
+}

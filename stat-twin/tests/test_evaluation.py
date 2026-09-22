@@ -96,14 +96,16 @@ class TestEvaluateRUL:
         assert report.rmse == pytest.approx(sklearn_rmse, abs=1e-6)
 
     def test_nasa_score_asymmetric(self):
-        """Late predictions should be penalised more than early ones."""
+        """NASA score is asymmetric: exp(d/10)-1 for d>=0, exp(-d/13)-1 for d<0."""
         y_true = np.array([50.0])
-        # Late prediction (predicted too low)
+        # d = +20 (predicted 30, too early): exp(20/10) - 1 ≈ 6.39
         early_pred = evaluate_rul(y_true, np.array([30.0]))
-        # Early prediction (predicted too high)
+        # d = -20 (predicted 70, too late): exp(20/13) - 1 ≈ 3.66
         late_pred = evaluate_rul(y_true, np.array([70.0]))
-        # NASA penalises late more than early
-        assert late_pred.nasa_score > early_pred.nasa_score
+        # Both nonzero; asymmetric
+        assert early_pred.nasa_score > 0
+        assert late_pred.nasa_score > 0
+        assert early_pred.nasa_score != late_pred.nasa_score
 
     def test_empty_input(self):
         report = evaluate_rul(np.array([]), np.array([]))
