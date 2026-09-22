@@ -338,13 +338,13 @@ section[data-testid="stSidebar"] hr { border-color: var(--border) !important; }
 RESULTS_DIR = _PROJECT_ROOT / "results"
 
 PAGES = {
-    "⚙️  Overview": "pages/1_overview",
-    "📡  Sensor Monitoring": "pages/2_sensors",
-    "🏥  Statistical Health": "pages/3_health",
-    "🔮  Failure Forecast": "pages/4_forecast",
-    "🔍  Explainability": "pages/5_explain",
-    "🔧  What-If Simulator": "pages/6_whatif",
-    "📊  Model Comparison": "pages/7_comparison",
+    "⚙️  Overview": "views/1_overview",
+    "📡  Sensor Monitoring": "views/2_sensors",
+    "🏥  Statistical Health": "views/3_health",
+    "🔮  Failure Forecast": "views/4_forecast",
+    "🔍  Explainability": "views/5_explain",
+    "🔧  What-If Simulator": "views/6_whatif",
+    "📊  Model Comparison": "views/7_comparison",
 }
 
 st.sidebar.markdown(
