@@ -1,4 +1,10 @@
 {
+  "fault_types": [
+    "spike",
+    "stuck",
+    "dropout",
+    "noise"
+  ],
   "dq_detection": {
     "spike": {
       "precision": 0.92,
@@ -19,6 +25,7 @@
   },
   "false_alarm_reduction": {
     "without_gating": 0.15,
-    "with_gating": 0.04
+    "with_gating": 0.04,
+    "reduction_pct": 73.3
   }
 }

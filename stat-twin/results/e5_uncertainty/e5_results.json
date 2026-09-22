@@ -1,22 +1,25 @@
 {
   "h10": {
-    "brier": 0.1997,
-    "ece": 0.069
+    "brier": 0.0175,
+    "ece": 0.0174
   },
   "h20": {
-    "brier": 0.1997,
-    "ece": 0.069
+    "brier": 0.0258,
+    "ece": 0.0251
   },
   "h30": {
-    "brier": 0.1997,
-    "ece": 0.069
+    "brier": 0.039,
+    "ece": 0.037
   },
   "h40": {
-    "brier": 0.1997,
-    "ece": 0.069
+    "brier": 0.0476,
+    "ece": 0.0413
   },
   "h50": {
-    "brier": 0.1997,
-    "ece": 0.069
+    "brier": 0.0582,
+    "ece": 0.0479
+  },
+  "conformal": {
+    "error": "conformal_intervals() missing 3 required positional arguments: 'sigma_cal', 'yhat_test', and 'sigma_test'"
   }
 }
