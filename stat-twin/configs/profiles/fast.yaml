@@ -1,0 +1,33 @@
+# Fast profile - development loop
+extends: ../base.yaml
+seed: 42
+dataset:
+  name: FD001
+  raw_dir: data/raw/CMAPSS
+  rul_clip: 125
+  use_age_feature: false
+split:
+  scheme: group_kfold
+  n_splits: 3
+  group_col: unit_id
+model:
+  gru:
+    hidden: 64
+    layers: 2
+    dropout: 0.2
+    ensemble_size: 3
+  xgb:
+    n_estimators: 400
+    max_depth: 5
+    learning_rate: 0.05
+  rf:
+    n_estimators: 200
+    max_depth: 10
+  lr:
+    C: 1.0
+    max_iter: 1000
+  lstm:
+    hidden: 64
+    layers: 2
+    dropout: 0.2
+    ensemble_size: 3

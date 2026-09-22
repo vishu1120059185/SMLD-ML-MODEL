@@ -1,0 +1,46 @@
+# Smoke profile - for CI and unit tests (no real data needed)
+extends: ../base.yaml
+seed: 42
+dataset:
+  name: smoke
+  raw_dir: data/raw/CMAPSS
+  rul_clip: 125
+  use_age_feature: false
+split:
+  scheme: group_kfold
+  n_splits: 2
+  group_col: unit_id
+stats:
+  windows: [5, 10]
+  ewma_alpha: [0.3]
+  baseline_cycles: 15
+  corr:
+    methods: [pearson]
+    pairs: top_k
+    top_k: 5
+  shift: [ks]
+forecast:
+  horizons: [10, 30, 50]
+  seq_len: 10
+  enforce_monotone: true
+model:
+  gru:
+    hidden: 32
+    layers: 1
+    dropout: 0.1
+    ensemble_size: 1
+  xgb:
+    n_estimators: 50
+    max_depth: 3
+    learning_rate: 0.1
+  rf:
+    n_estimators: 50
+    max_depth: 5
+  lr:
+    C: 1.0
+    max_iter: 500
+  lstm:
+    hidden: 32
+    layers: 1
+    dropout: 0.1
+    ensemble_size: 1
