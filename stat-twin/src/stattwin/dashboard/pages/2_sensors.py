@@ -1,4 +1,4 @@
-"""Page 2 — SENSOR MONITORING: raw signals, rolling stats, EWMA, Z-scores."""
+"""Page 2 — SENSOR MONITORING: live signals, rolling stats, EWMA, Z-scores."""
 from __future__ import annotations
 
 import json
@@ -10,6 +10,13 @@ import streamlit as st
 
 from stattwin.dashboard.components.cards import kpi_card, provenance_badge, section_header
 from stattwin.dashboard.components.charts import sparkline, timeline_chart
+from stattwin.dashboard.components.live import (
+    LIVE_INTERVAL,
+    current_tick,
+    live_series,
+    live_status,
+    live_window,
+)
 
 RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
 
@@ -29,22 +36,37 @@ def _load(name: str, machine: str | None = None):
     return None
 
 
-def render():
+def _rolling(values: np.ndarray, window: int) -> tuple[np.ndarray, np.ndarray]:
+    w = max(1, min(int(window), len(values)))
+    kernel = np.ones(w) / w
+    rmean = np.convolve(values, kernel, mode="same")
+    rstd = np.array(
+        [np.std(values[max(0, j - w) : j + 1]) for j in range(len(values))],
+        dtype=float,
+    )
+    return rmean, rstd
+
+
+def _ewma(values: np.ndarray, alpha: float) -> np.ndarray:
+    ewma = np.zeros_like(values)
+    if len(values) == 0:
+        return ewma
+    ewma[0] = values[0]
+    for j in range(1, len(values)):
+        ewma[j] = alpha * values[j] + (1.0 - alpha) * ewma[j - 1]
+    return ewma
+
+
+def render() -> None:
+    """Render the live Sensor Monitoring page."""
     machine: str = st.session_state.get("selected_machine", "MACHINE-001")
     st.markdown(f"# 📡 Sensor Monitoring — {machine}")
 
     sensor_data = _load("sensor_data.json", machine)
-    dq_flags = _load("dq_flags.json", machine)
-
-    if sensor_data is None:
-        st.warning(
-            "Sensor data not found in `results/`. "
-            "Place **sensor_data.json** with keys `sensors` (dict of name→{timestamps, values}) "
-            "in the machine's results directory."
-        )
-        # Generate demo data so the UI is functional
+    demo_mode = sensor_data is None
+    if demo_mode:
         sensor_data = _generate_demo()
-        st.info("Showing **demo** data for UI validation.")
+        st.info("Sensor data not found in `results/` — showing **demo** data.")
 
     sensors: dict = sensor_data.get("sensors", {})
     if not sensors:
@@ -53,7 +75,6 @@ def render():
 
     sensor_names = sorted(sensors.keys())
 
-    # ── Sidebar filters ─────────────────────────────────────────────────────
     selected = st.multiselect(
         "Select sensors",
         sensor_names,
@@ -67,106 +88,147 @@ def render():
         st.info("Select at least one sensor above.")
         return
 
-    # ── KPI summary row ─────────────────────────────────────────────────────
-    cols = st.columns(min(len(selected), 4))
-    for i, sname in enumerate(selected[:4]):
-        vals = sensors[sname].get("values", [])
-        if vals:
+    @st.fragment(run_every=LIVE_INTERVAL)
+    def live_sensors() -> None:
+        live_status("sensors", feed="sliding sensor window · rolling · EWMA @ 2s")
+        tick = current_tick()
+
+        raw = _load("sensor_data.json", machine)
+        is_demo = raw is None
+        dq_flags = _load("dq_flags.json", machine)
+        data = raw if raw is not None else _generate_demo()
+        live_map: dict = data.get("sensors", {})
+        prov = "SIMULATED" if is_demo else "OBSERVED"
+
+        cols = st.columns(min(len(selected), 4))
+        for i, sname in enumerate(selected[:4]):
+            sdata = live_map.get(sname)
+            if not sdata:
+                continue
+            vals = live_series(
+                f"{machine}:{sname}",
+                tick,
+                n=150,
+                base_values=sdata.get("values", []),
+            )
             with cols[i]:
                 kpi_card(
                     sname,
                     f"{vals[-1]:.3f}",
-                    delta=f"mean={np.mean(vals):.3f}  σ={np.std(vals):.3f}",
-                    provenance="OBSERVED",
-                )
-
-    st.markdown("---")
-
-    # ── Per-sensor charts ───────────────────────────────────────────────────
-    for sname in selected:
-        sdata = sensors[sname]
-        timestamps = sdata.get("timestamps", list(range(len(sdata.get("values", [])))))
-        values = np.array(sdata.get("values", []), dtype=float)
-
-        if len(values) == 0:
-            continue
-
-        # Rolling mean / std band
-        rmean = np.convolve(values, np.ones(window) / window, mode="same")
-        rstd = np.array([
-            np.std(values[max(0, j - window): j + 1]) for j in range(len(values))
-        ])
-        upper = rmean + 2 * rstd
-        lower = rmean - 2 * rstd
-
-        # EWMA
-        ewma = np.zeros_like(values)
-        ewma[0] = values[0]
-        for j in range(1, len(values)):
-            ewma[j] = ewma_alpha * values[j] + (1 - ewma_alpha) * ewma[j - 1]
-
-        # Z-score (rolling)
-        overall_mean = np.mean(values)
-        overall_std = np.std(values) or 1.0
-        zscore = (values - overall_mean) / overall_std
-
-        col_chart, col_z = st.columns([3, 1])
-
-        with col_chart:
-            bands = [{
-                "upper": upper, "lower": lower,
-                "label": f"±2σ ({window})",
-                "fill": "rgba(59,130,246,0.10)",
-            }]
-            fig = timeline_chart(
-                timestamps, values.tolist(),
-                title=f"{sname} — Raw + Rolling + EWMA",
-                y_label="Value",
-                bands=bands,
-                extra_traces=[
-                    go.Scatter(
-                        x=list(timestamps), y=ewma.tolist(),
-                        mode="lines", name="EWMA",
-                        line=dict(color="#F5A623", width=1.5, dash="dot"),
-                    )
-                ],
-            )
-            st.plotly_chart(fig, use_container_width=True, key=f"sensor_{sname}")
-
-        with col_z:
-            fig_z = timeline_chart(
-                timestamps, zscore.tolist(),
-                title=f"{sname} — Z-Score",
-                y_label="Z",
-            )
-            fig_z.add_hline(y=2, line_dash="dash", line_color="#D64545", line_width=1)
-            fig_z.add_hline(y=-2, line_dash="dash", line_color="#D64545", line_width=1)
-            st.plotly_chart(fig_z, use_container_width=True, key=f"zscore_{sname}")
-
-        # ── DQ-flag markers ─────────────────────────────────────────────────
-        if dq_flags and sname in dq_flags:
-            flags = dq_flags[sname]
-            flagged_idx = flags.get("flagged_indices", [])
-            if flagged_idx:
-                st.markdown(
-                    f"⚠ {sname}: **{len(flagged_idx)}** DQ-flagged points "
-                    f"({provenance_badge('OBSERVED')})",
-                    unsafe_allow_html=True,
+                    delta=f"mean={np.mean(vals):.3f}  σ={np.std(vals):.3f}  tick #{tick}",
+                    provenance=prov,
                 )
 
         st.markdown("---")
 
-    # ── Sparkline strip ─────────────────────────────────────────────────────
-    section_header("Sensor Sparklines")
-    spark_cols = st.columns(min(len(selected), 6))
-    for i, sname in enumerate(selected[:6]):
-        vals = sensors[sname].get("values", [])
-        if vals:
+        for sname in selected:
+            sdata = live_map.get(sname)
+            if not sdata:
+                continue
+            timestamps, values = live_window(
+                f"{machine}:{sname}",
+                tick,
+                n=150,
+                base_values=sdata.get("values", []),
+                timestamps=sdata.get("timestamps"),
+            )
+            if len(values) == 0:
+                continue
+
+            rmean, rstd = _rolling(values, window)
+            upper = rmean + 2 * rstd
+            lower = rmean - 2 * rstd
+            ewma = _ewma(values, ewma_alpha)
+            overall_mean = float(np.mean(values))
+            overall_std = float(np.std(values)) or 1.0
+            zscore = (values - overall_mean) / overall_std
+
+            col_chart, col_z = st.columns([3, 1])
+            with col_chart:
+                bands = [
+                    {
+                        "upper": upper,
+                        "lower": lower,
+                        "label": f"±2σ ({min(window, len(values))})",
+                        "fill": "rgba(59,130,246,0.10)",
+                    }
+                ]
+                fig = timeline_chart(
+                    timestamps,
+                    values.tolist(),
+                    title=f"{sname} — Raw + Rolling + EWMA",
+                    y_label="Value",
+                    bands=bands,
+                    extra_traces=[
+                        go.Scatter(
+                            x=list(timestamps),
+                            y=ewma.tolist(),
+                            mode="lines",
+                            name="EWMA",
+                            line=dict(color="#F5A623", width=1.5, dash="dot"),
+                        ),
+                        go.Scatter(
+                            x=list(timestamps),
+                            y=rmean.tolist(),
+                            mode="lines",
+                            name="Rolling mean",
+                            line=dict(color="#10B981", width=1.2),
+                        ),
+                    ],
+                )
+                st.plotly_chart(fig, width="stretch", key=f"sensor_{sname}_{tick}")
+
+            with col_z:
+                fig_z = timeline_chart(
+                    timestamps,
+                    zscore.tolist(),
+                    title=f"{sname} — Z-Score",
+                    y_label="Z",
+                )
+                fig_z.add_hline(
+                    y=2, line_dash="dash", line_color="#EF4444", line_width=1
+                )
+                fig_z.add_hline(
+                    y=-2, line_dash="dash", line_color="#EF4444", line_width=1
+                )
+                st.plotly_chart(fig_z, width="stretch", key=f"zscore_{sname}_{tick}")
+
+            if dq_flags and sname in dq_flags:
+                flagged_idx = dq_flags[sname].get("flagged_indices", [])
+                if flagged_idx:
+                    st.markdown(
+                        f"⚠ {sname}: **{len(flagged_idx)}** DQ-flagged points "
+                        f"({provenance_badge('OBSERVED')})",
+                        unsafe_allow_html=True,
+                    )
+
+            st.markdown("---")
+
+        section_header("Sensor Sparklines")
+        spark_cols = st.columns(min(len(selected), 6))
+        for i, sname in enumerate(selected[:6]):
+            sdata = live_map.get(sname)
+            if not sdata:
+                continue
+            vals = live_series(
+                f"{machine}:{sname}",
+                tick,
+                n=150,
+                base_values=sdata.get("values", []),
+            )
             with spark_cols[i]:
-                st.markdown(f"<div style='text-align:center;font-size:0.72rem;"
-                            f"color:#8B949E;'>{sname}</div>", unsafe_allow_html=True)
-                fig = sparkline(vals)
-                st.plotly_chart(fig, use_container_width=True, key=f"spark_{sname}")
+                st.markdown(
+                    f"<div style='text-align:center;font-size:0.72rem;"
+                    f"color:#9CA3AF;'>{sname}</div>",
+                    unsafe_allow_html=True,
+                )
+                st.plotly_chart(
+                    sparkline(vals),
+                    width="stretch",
+                    key=f"spark_{sname}_{tick}",
+                )
+
+    live_sensors()
 
 
 def _generate_demo() -> dict:

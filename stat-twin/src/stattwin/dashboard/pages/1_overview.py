@@ -1,9 +1,10 @@
-"""Page 1 — OVERVIEW: machine health at a glance."""
+"""Page 1 — OVERVIEW: machine health at a glance, live 2s auto-refresh."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
+import numpy as np
 import streamlit as st
 
 from stattwin.dashboard.components.cards import (
@@ -13,6 +14,17 @@ from stattwin.dashboard.components.cards import (
     state_badge,
 )
 from stattwin.dashboard.components.charts import gauge_chart, timeline_chart
+from stattwin.dashboard.components.live import (
+    LIVE_INTERVAL,
+    clip01,
+    current_tick,
+    live_scalar,
+    live_status,
+    live_wave,
+    rul_countdown,
+    slide_window,
+    state_from_shi,
+)
 
 RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
 
@@ -33,122 +45,177 @@ def _load(name: str, machine: str | None = None):
     return None
 
 
-def render():
+def render() -> None:
+    """Render the live Overview page."""
     machine: str = st.session_state.get("selected_machine", "MACHINE-001")
     st.markdown(f"# ⚙ Overview — {machine}")
 
-    # ── Load artifacts ──────────────────────────────────────────────────────
-    health = _load("health_summary.json", machine)
-    forecast = _load("failure_forecast.json", machine)
-    recommendations = _load("recommendations.json", machine)
-    dq = _load("data_quality.json", machine)
-    timeline_data = _load("shi_timeline.json", machine)
-    risk_data = _load("risk_timeline.json", machine)
+    @st.fragment(run_every=LIVE_INTERVAL)
+    def live_overview() -> None:
+        live_status("overview", feed="SHI · probability · risk stream @ 2s")
+        tick = current_tick()
 
-    # ── KPI row ─────────────────────────────────────────────────────────────
-    col1, col2, col3, col4 = st.columns(4)
+        health = _load("health_summary.json", machine)
+        forecast = _load("failure_forecast.json", machine)
+        recommendations = _load("recommendations.json", machine)
+        dq = _load("data_quality.json", machine)
+        timeline_data = _load("shi_timeline.json", machine)
+        risk_data = _load("risk_timeline.json", machine)
 
-    state = health.get("state", "HEALTHY") if health else "HEALTHY"
-    shi = health.get("shi", 0.0) if health else 0.0
-    failure_prob = forecast.get("failure_prob_30", 0.0) if forecast else 0.0
-    rul = forecast.get("rul", None) if forecast else None
-    rul_ci = forecast.get("rul_ci", [None, None]) if forecast else [None, None]
+        if health is None and forecast is None and timeline_data is None:
+            st.info("No machine artifacts in `results/` — showing a demo live stream.")
 
-    with col1:
-        st.markdown(
-            f"<div style='background:#161B22;border:1px solid #21262D;border-radius:8px;"
-            f"padding:14px 16px;'>"
-            f"<div style='font-size:0.72rem;color:#8B949E;text-transform:uppercase;"
-            f"letter-spacing:0.8px;margin-bottom:6px;'>State</div>"
-            f"<div style='margin-bottom:4px;'>{state_badge(state)}</div></div>",
-            unsafe_allow_html=True,
-        )
+        shi_base = float(health.get("shi", 0.28)) if health else 0.28
+        shi = clip01(live_scalar(shi_base, tick, amp=0.03, name=f"{machine}:shi"))
+        state = state_from_shi(shi)
+        fp_base = float(forecast.get("failure_prob_30", 0.17)) if forecast else 0.17
+        fp = clip01(live_scalar(fp_base, tick, amp=0.015, name=f"{machine}:fp"))
+        rul_base = float(forecast.get("rul", 45.0)) if forecast else 45.0
+        rul = rul_countdown(rul_base, tick)
+        rul_ci = forecast.get("rul_ci", [None, None]) if forecast else [None, None]
+        prov = "OBSERVED" if health else "SIMULATED"
 
-    with col2:
-        kpi_card("SHI", f"{shi:.3f}", provenance="OBSERVED")
-
-    with col3:
-        kpi_card("P(Failure +30d)", f"{failure_prob:.1%}", provenance="PREDICTED")
-
-    with col4:
-        if rul is not None:
-            ci_str = f"[{rul_ci[0]:.0f} – {rul_ci[1]:.0f}]" if rul_ci[0] is not None else ""
-            kpi_card("RUL (days)", f"{rul:.0f} {ci_str}", provenance="PREDICTED")
-        else:
-            kpi_card("RUL (days)", "—")
-
-    # ── SHI Gauge + Risk Timeline ──────────────────────────────────────────
-    left, right = st.columns([1, 2])
-
-    with left:
-        section_header("SHI Gauge")
-        fig = gauge_chart(shi, title="Statistical Health Index")
-        st.plotly_chart(fig, use_container_width=True, key="shi_gauge")
-
-    with right:
-        section_header("Risk Timeline")
-        if risk_data:
-            timestamps = risk_data.get("timestamps", [])
-            risk_vals = risk_data.get("risk", [])
-            bands_data = []
-            if "upper" in risk_data and "lower" in risk_data:
-                bands_data.append({
-                    "upper": risk_data["upper"],
-                    "lower": risk_data["lower"],
-                    "label": "95 % CI",
-                    "fill": "rgba(76,139,245,0.10)",
-                })
-            fig = timeline_chart(
-                timestamps, risk_vals,
-                title="Failure Risk Over Time",
-                y_label="Risk",
-                bands=bands_data,
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.markdown(
+                f"<div style='background:#111827;border:1px solid #1F2937;"
+                f"border-radius:10px;padding:14px 16px;'>"
+                f"<div style='font-size:0.72rem;color:#9CA3AF;text-transform:uppercase;"
+                f"letter-spacing:0.8px;margin-bottom:6px;'>State · live</div>"
+                f"<div style='margin-bottom:4px;'>{state_badge(state)}</div>"
+                f"<div style='font-size:0.68rem;color:#9CA3AF;font-family:"
+                f"'JetBrains Mono',monospace;'>tick #{tick}</div></div>",
+                unsafe_allow_html=True,
             )
-            st.plotly_chart(fig, use_container_width=True, key="risk_timeline")
+        with col2:
+            kpi_card(
+                "SHI",
+                f"{shi:.3f}",
+                delta=f"live · tick #{tick}",
+                provenance=prov,
+            )
+        with col3:
+            kpi_card(
+                "P(Failure +30d)",
+                f"{fp:.1%}",
+                delta="live · simulated stream",
+                provenance="PREDICTED",
+            )
+        with col4:
+            ci_str = (
+                f"[{rul_ci[0]:.0f} – {rul_ci[1]:.0f}]"
+                if rul_ci and rul_ci[0] is not None
+                else ""
+            )
+            kpi_card(
+                "RUL (days)",
+                f"{rul:.1f} {ci_str}".strip(),
+                delta="counting down · live",
+                provenance="PREDICTED",
+            )
+
+        left, right = st.columns([1, 2])
+        with left:
+            section_header("SHI Gauge")
+            st.plotly_chart(
+                gauge_chart(shi, title="Statistical Health Index"),
+                width="stretch",
+                key=f"ov_gauge_{tick}",
+            )
+        with right:
+            section_header("Risk Timeline")
+            if risk_data and risk_data.get("risk"):
+                ts = list(risk_data.get("timestamps", []))
+                vals = list(risk_data.get("risk", []))
+                win = min(150, len(vals))
+                i0 = slide_window(len(vals), tick, win, step=3)
+                x = ts[i0 : i0 + win]
+                y = np.asarray(vals[i0 : i0 + win], dtype=float)
+                bands = []
+                upper = risk_data.get("upper")
+                lower = risk_data.get("lower")
+                if upper and lower and len(upper) == len(vals):
+                    bands.append(
+                        {
+                            "upper": np.asarray(upper[i0 : i0 + win], dtype=float),
+                            "lower": np.asarray(lower[i0 : i0 + win], dtype=float),
+                            "label": "95 % CI",
+                            "fill": "rgba(76,139,245,0.10)",
+                        }
+                    )
+                title = "Failure Risk Over Time"
+            else:
+                x = list(range(150))
+                y = live_wave(
+                    f"{machine}:risk", tick, n=150, base=0.35, scale=0.06, low=0.0, high=1.0
+                )
+                bands = [
+                    {
+                        "upper": np.minimum(1.0, y + 0.05),
+                        "lower": np.maximum(0.0, y - 0.05),
+                        "label": "95 % CI",
+                        "fill": "rgba(76,139,245,0.10)",
+                    }
+                ]
+                title = "Failure Risk Over Time (demo stream)"
+            fig = timeline_chart(x, y, title=title, y_label="Risk", bands=bands)
+            st.plotly_chart(fig, width="stretch", key=f"ov_risk_{tick}")
+
+        section_header("Data Quality")
+        if dq:
+            col_a, col_b, col_c, col_d = st.columns(4)
+            with col_a:
+                kpi_card("Completeness", f"{dq.get('completeness', 0):.1%}")
+            with col_b:
+                kpi_card("Timeliness", f"{dq.get('timeliness', 0):.1%}")
+            with col_c:
+                kpi_card("Plausibility", f"{dq.get('plausibility', 0):.1%}")
+            with col_d:
+                kpi_card("Overall DQ", f"{dq.get('overall', 0):.1%}")
         else:
-            st.info("Risk timeline data not available in results/.")
+            st.info("Data-quality metrics not available in results/.")
 
-    # ── DQ Status ───────────────────────────────────────────────────────────
-    section_header("Data Quality")
-    if dq:
-        col_a, col_b, col_c, col_d = st.columns(4)
-        with col_a:
-            kpi_card("Completeness", f"{dq.get('completeness', 0):.1%}")
-        with col_b:
-            kpi_card("Timeliness", f"{dq.get('timeliness', 0):.1%}")
-        with col_c:
-            kpi_card("Plausibility", f"{dq.get('plausibility', 0):.1%}")
-        with col_d:
-            kpi_card("Overall DQ", f"{dq.get('overall', 0):.1%}")
-    else:
-        st.info("Data-quality metrics not available in results/.")
-
-    # ── Recommendation ──────────────────────────────────────────────────────
-    section_header("Recommendations")
-    if recommendations:
-        recs = recommendations if isinstance(recommendations, list) else [recommendations]
-        for rec in recs[:3]:
+        section_header("Recommendations")
+        if recommendations:
+            recs = (
+                recommendations if isinstance(recommendations, list) else [recommendations]
+            )
+            for rec in recs[:3]:
+                recommendation_card(
+                    rec.get("text", str(rec)),
+                    priority=rec.get("priority", "medium"),
+                    provenance=rec.get("provenance", "PREDICTED"),
+                )
+        else:
             recommendation_card(
-                rec.get("text", str(rec)),
-                priority=rec.get("priority", "medium"),
-                provenance=rec.get("provenance", "PREDICTED"),
+                "All parameters nominal. Continue routine monitoring.",
+                priority="low",
+                provenance="OBSERVED",
             )
-    else:
-        recommendation_card(
-            "All parameters nominal. Continue routine monitoring.",
-            priority="low",
-            provenance="OBSERVED",
-        )
 
-    # ── SHI Timeline ────────────────────────────────────────────────────────
-    section_header("SHI Over Time")
-    if timeline_data:
-        fig = timeline_chart(
-            timeline_data.get("timestamps", []),
-            timeline_data.get("shi", []),
-            title="SHI Trajectory",
-            y_label="SHI",
-        )
-        st.plotly_chart(fig, use_container_width=True, key="shi_timeline")
-    else:
-        st.info("SHI timeline data not available in results/. Run the pipeline first.")
+        section_header("SHI Over Time")
+        if timeline_data and timeline_data.get("shi"):
+            ts = list(timeline_data.get("timestamps", []))
+            vals = list(timeline_data.get("shi", []))
+            win = min(150, len(vals))
+            i0 = slide_window(len(vals), tick, win, step=3)
+            x = ts[i0 : i0 + win]
+            y = np.asarray(vals[i0 : i0 + win], dtype=float)
+            y = np.clip(y + 0.008 * np.sin(np.arange(win) * 0.6 + tick * 0.5), 0.0, 1.0)
+            title = "SHI Trajectory"
+        else:
+            x = list(range(150))
+            y = live_wave(
+                f"{machine}:shi_wave",
+                tick,
+                n=150,
+                base=shi_base,
+                scale=0.05,
+                low=0.0,
+                high=1.0,
+            )
+            title = "SHI Trajectory (demo stream)"
+        fig = timeline_chart(x, y, title=title, y_label="SHI")
+        st.plotly_chart(fig, width="stretch", key=f"ov_shi_{tick}")
+
+    live_overview()
