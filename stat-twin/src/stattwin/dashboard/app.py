@@ -451,7 +451,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ── Dispatch to page module (absolute imports: stattwin.dashboard.pages.*) ───
+# ── Dispatch to page module (absolute imports: stattwin.dashboard.views.*) ───
 page_module_path = PAGES[selected_page]
 mod_name = f"stattwin.dashboard.{page_module_path.replace('/', '.')}"
 
