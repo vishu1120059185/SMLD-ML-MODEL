@@ -5,25 +5,25 @@ import numpy as np
 import plotly.graph_objects as go
 from typing import Sequence
 
-# ── Colour palette ──────────────────────────────────────────────────────────
-BG = "#0E1117"
-PAPER = "#161B22"
-GRID = "#21262D"
-TEXT = "#C9D1D9"
-ACCENT = "#4C8BF5"
+# ── Colour palette (matches app.py industrial dark theme) ──────────────────
+BG = "#0A0E17"
+PAPER = "#111827"
+GRID = "#1F2937"
+TEXT = "#F9FAFB"
+ACCENT = "#3B82F6"
 
 STATE_COLORS = {
-    "HEALTHY": "#2E9E6B",
-    "WATCH": "#E0B93B",
-    "DEGRADING": "#E8862F",
-    "CRITICAL": "#D64545",
-    "FAILURE-LIKELY": "#8E1B3A",
+    "HEALTHY": "#10B981",
+    "WATCH": "#F59E0B",
+    "DEGRADING": "#F97316",
+    "CRITICAL": "#EF4444",
+    "FAILURE-LIKELY": "#991B1B",
 }
 
 PROVENANCE_COLORS = {
-    "OBSERVED": "#4C8BF5",
-    "PREDICTED": "#F5A623",
-    "SIMULATED": "#9B6BFF",
+    "OBSERVED": "#3B82F6",
+    "PREDICTED": "#F59E0B",
+    "SIMULATED": "#8B5CF6",
 }
 
 PROVENANCE_DASH = {
@@ -75,7 +75,7 @@ def timeline_chart(
             fig.add_trace(go.Scatter(
                 x=list(timestamps), y=list(band.get("lower", [])),
                 fill="tonexty", mode="lines", line=dict(width=0),
-                fillcolor=band.get("fill", "rgba(76,139,245,0.12)"),
+                fillcolor=band.get("fill", "rgba(59,130,246,0.12)"),
                 name=band.get("label", "Band"),
             ))
 
@@ -85,11 +85,11 @@ def timeline_chart(
 
     if state_changes:
         colors = {
-            "HEALTHY": "rgba(46,158,107,0.08)",
-            "WATCH": "rgba(224,185,59,0.08)",
-            "DEGRADING": "rgba(232,134,47,0.10)",
-            "CRITICAL": "rgba(214,69,69,0.12)",
-            "FAILURE-LIKELY": "rgba(142,27,58,0.14)",
+            "HEALTHY": "rgba(16,185,129,0.08)",
+            "WATCH": "rgba(245,158,11,0.08)",
+            "DEGRADING": "rgba(249,115,22,0.10)",
+            "CRITICAL": "rgba(239,68,68,0.12)",
+            "FAILURE-LIKELY": "rgba(153,27,27,0.14)",
         }
         for sc in state_changes:
             fig.add_vrect(
@@ -119,10 +119,10 @@ def gauge_chart(value: float, title: str = "SHI", max_val: float = 1.0) -> go.Fi
             bgcolor=PAPER,
             borderwidth=0,
             steps=[
-                dict(range=[0, 0.25], color="#2E9E6B"),
-                dict(range=[0.25, 0.50], color="#E0B93B"),
-                dict(range=[0.50, 0.75], color="#E8862F"),
-                dict(range=[0.75, 1.0], color="#D64545"),
+                dict(range=[0, 0.25], color="#10B981"),
+                dict(range=[0.25, 0.50], color="#F59E0B"),
+                dict(range=[0.50, 0.75], color="#F97316"),
+                dict(range=[0.75, 1.0], color="#EF4444"),
             ],
         ),
         title=dict(text=title, font=dict(size=14)),
@@ -230,7 +230,7 @@ def sparkline(values: Sequence[float], *, height: int = 80, color: str = ACCENT)
     fig = go.Figure(go.Scatter(
         y=list(values), mode="lines",
         line=dict(color=color, width=1.2),
-        fill="tozeroy", fillcolor=f"rgba(76,139,245,0.10)",
+        fill="tozeroy", fillcolor="rgba(59,130,246,0.10)",
     ))
     fig.update_layout(
         paper_bgcolor=PAPER, plot_bgcolor=BG,

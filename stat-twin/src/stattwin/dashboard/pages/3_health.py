@@ -8,10 +8,10 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 
-from ..components.charts import timeline_chart, heatmap_chart, bar_chart
-from ..components.cards import kpi_card, state_badge, section_header
+from stattwin.dashboard.components.charts import timeline_chart, heatmap_chart, bar_chart
+from stattwin.dashboard.components.cards import kpi_card, state_badge, section_header
 
-RESULTS_DIR = Path(__file__).resolve().parents[3] / "results"
+RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
 
 STATE_COLORS = {
     "HEALTHY": "#2E9E6B",

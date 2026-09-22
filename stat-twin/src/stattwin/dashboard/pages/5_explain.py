@@ -8,10 +8,10 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 
-from ..components.charts import bar_chart, sparkline, multi_line_chart
-from ..components.cards import evidence_card, section_header, provenance_badge
+from stattwin.dashboard.components.charts import bar_chart, sparkline, multi_line_chart
+from stattwin.dashboard.components.cards import evidence_card, section_header, provenance_badge
 
-RESULTS_DIR = Path(__file__).resolve().parents[3] / "results"
+RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
 
 
 def _load(name: str, machine: str | None = None):
