@@ -31,12 +31,11 @@ Safety
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, Sequence
+from dataclasses import dataclass
+from typing import Any, Protocol
 
 import numpy as np
 import pandas as pd
-from scipy import stats as sp_stats
 
 __all__ = [
     "SimulationBadge",
@@ -88,8 +87,8 @@ class SimulationBadge:
 
     def __post_init__(self) -> None:
         if not self.timestamp:
-            from datetime import datetime, timezone
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            from datetime import UTC, datetime
+            self.timestamp = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise to a dictionary."""

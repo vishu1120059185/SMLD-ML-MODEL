@@ -22,7 +22,7 @@ rather than causal claims.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, Sequence
+from typing import Any, Protocol
 
 import numpy as np
 import pandas as pd
@@ -316,7 +316,10 @@ def risk_change_decomposition(
 
         for stat_type in stat_types:
             # Find features for this sensor + stat type
-            matching_feats = [f for f in derived if f"_{stat_type}_" in f or f.endswith(f"_{stat_type}")]
+            matching_feats = [
+                f for f in derived
+                if f"_{stat_type}_" in f or f.endswith(f"_{stat_type}")
+            ]
             if not matching_feats:
                 continue
 
@@ -326,7 +329,11 @@ def risk_change_decomposition(
                     x_partial[feat] = x_now[feat].values
 
             proba_partial = model.predict_proba(x_partial)
-            p_partial = float(proba_partial[label_col].iloc[0]) if label_col in proba_partial.columns else p_ref
+            p_partial = (
+                float(proba_partial[label_col].iloc[0])
+                if label_col in proba_partial.columns
+                else p_ref
+            )
             contribution = p_partial - p_ref
 
             sensor_total += contribution
@@ -391,11 +398,11 @@ def shap_attribution(
     """
     try:
         import shap
-    except ImportError:
+    except ImportError as exc:
         raise ImportError(
             "shap package is required for shap_attribution(). "
             "Install it with: pip install shap"
-        )
+        ) from exc
 
     x = X_current[feature_cols].iloc[[0]].copy()
 

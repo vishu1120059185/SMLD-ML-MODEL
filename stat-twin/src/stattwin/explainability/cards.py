@@ -21,7 +21,7 @@ returned as an ``EvidenceCardSet``.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -336,7 +336,6 @@ def build_evidence_cards(
 
     # Get current row index (last row at or before target cycle)
     current_row = unit_data.iloc[-1]
-    current_cycle_actual = int(current_row[cycle_col])
 
     # Baseline: first baseline_cycles of this unit
     all_unit_data = df[unit_mask].sort_values(cycle_col)
