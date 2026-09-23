@@ -7,30 +7,50 @@ from __future__ import annotations
 
 import streamlit as st
 
-# ── Design tokens (matches app.py industrial dark theme) ────────────────────
-CARD_BG = "#111827"
-CARD_BORDER = "#1F2937"
-TEXT_PRIMARY = "#F9FAFB"
-TEXT_SECONDARY = "#9CA3AF"
-ACCENT = "#3B82F6"
-SUCCESS = "#10B981"
-WARNING = "#F59E0B"
-DANGER = "#EF4444"
-SHADOW = "0 4px 6px -1px rgba(0,0,0,0.45), 0 2px 4px -2px rgba(0,0,0,0.35)"
+from stattwin.dashboard.components.theme import (
+    ACCENT,
+    BORDER,
+    CARD,
+    DANGER,
+    MONO,
+    MUTED,
+    PROVENANCE_COLORS,
+    SHADOW,
+    STATE_COLORS,
+    SUCCESS,
+    TEXT,
+    WARNING,
+)
 
-STATE_COLORS = {
-    "HEALTHY": SUCCESS,
-    "WATCH": WARNING,
-    "DEGRADING": "#F97316",
-    "CRITICAL": DANGER,
-    "FAILURE-LIKELY": "#991B1B",
-}
+__all__ = [
+    "CARD_BG",
+    "CARD_BORDER",
+    "TEXT_PRIMARY",
+    "TEXT_SECONDARY",
+    "SHADOW",
+    "STATE_COLORS",
+    "PROVENANCE_COLORS",
+    "state_badge",
+    "provenance_badge",
+    "freshness_indicator",
+    "kpi_card",
+    "evidence_card",
+    "recommendation_card",
+    "delta_card",
+    "alert_card",
+    "progress_card",
+    "disclaimer_banner",
+    "section_header",
+    "page_header",
+    "skeleton_card",
+]
 
-PROVENANCE_COLORS = {
-    "OBSERVED": ACCENT,
-    "PREDICTED": WARNING,
-    "SIMULATED": "#8B5CF6",
-}
+# Back-compat aliases (older views import these names)
+CARD_BG = CARD
+CARD_BORDER = BORDER
+TEXT_PRIMARY = TEXT
+TEXT_SECONDARY = MUTED
+SHADOW = SHADOW
 
 PROVENANCE_TOOLTIPS = {
     "OBSERVED": "Directly measured from sensor telemetry",
@@ -48,9 +68,8 @@ SEVERITY_COLORS = {
 
 def _badge(label: str, bg: str, fg: str = "#FFFFFF") -> str:
     return (
-        f'<span style="background:{bg};color:{fg};padding:2px 8px;'
-        f'border-radius:4px;font-size:0.72rem;font-weight:600;'
-        f'letter-spacing:0.4px;">{label}</span>'
+        f'<span class="st-badge" style="background:{bg};color:{fg};'
+        f'border-color:{bg}55;">{label}</span>'
     )
 
 
@@ -114,26 +133,13 @@ def kpi_card(
     """Render a KPI metric card with optional tooltip and provenance."""
     prov_html = f" {provenance_badge(provenance)}" if provenance else ""
     label_html = _tooltip(label) if tooltip else label
+    delta_html = f'<div class="st-kpi-delta">{delta}</div>' if delta else ""
     st.markdown(
         f"""
-        <div style="
-            background:{CARD_BG}; border:1px solid {CARD_BORDER}; border-radius:10px;
-            padding:16px 18px; margin-bottom:12px; box-shadow:{SHADOW};
-        ">
-            <div style="font-size:0.72rem; color:{TEXT_SECONDARY}; text-transform:uppercase;
-                        letter-spacing:1px; margin-bottom:6px; font-weight:600;">
-                {label_html}{prov_html}
-            </div>
-            <div style="font-size:1.6rem; font-weight:700; color:{TEXT_PRIMARY};
-                        font-family:'JetBrains Mono','Fira Code',monospace;">
-                {value}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    if delta:
-        st.caption(delta)
+        <div class="st-kpi">
+            <div class="st-kpi-label">{label_html}{prov_html}</div>
+            <div class="st-kpi-value">{value}</div>
+            {delta_html}
 
 
 def evidence_card(
@@ -147,26 +153,19 @@ def evidence_card(
     """Evidence card with provenance badge and severity indicator."""
     border = SEVERITY_COLORS.get(severity, CARD_BORDER)
     sensor_html = (
-        f'<span style="color:{TEXT_SECONDARY};font-size:0.72rem;"> | {sensor}</span>'
-        if sensor else ""
+        f'<span style="color:{MUTED};font-size:0.72rem;font-family:{MONO};"> · {sensor}</span>'
+        if sensor
+        else ""
     )
     st.markdown(
         f"""
-        <div style="
-            background:{CARD_BG}; border-left:3px solid {border};
-            border-radius:0 8px 8px 0; padding:12px 16px; margin-bottom:10px;
-            box-shadow:{SHADOW};
-        ">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                <span style="font-weight:600; color:{TEXT_PRIMARY}; font-size:0.88rem;">
-                    {title}
-                </span>
+        <div class="st-card" style="border-left:3px solid {border};">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap;">
+                <span style="font-weight:650; color:{TEXT}; font-size:0.9rem;">{title}</span>
                 {provenance_badge(provenance)}
                 {sensor_html}
             </div>
-            <div style="color:{TEXT_SECONDARY}; font-size:0.82rem; line-height:1.45;">
-                {body}
-            </div>
+            <div style="color:{MUTED}; font-size:0.84rem; line-height:1.5;">{body}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -180,29 +179,17 @@ def recommendation_card(
     provenance: str = "PREDICTED",
 ):
     """Actionable recommendation card with priority and provenance."""
-    prio_colors = {
-        "high": DANGER,
-        "medium": WARNING,
-        "low": SUCCESS,
-    }
+    prio_colors = {"high": DANGER, "medium": WARNING, "low": SUCCESS}
     border = prio_colors.get(priority, ACCENT)
     st.markdown(
         f"""
-        <div style="
-            background:{CARD_BG}; border-left:3px solid {border};
-            border-radius:0 8px 8px 0; padding:12px 16px; margin-bottom:10px;
-            box-shadow:{SHADOW};
-        ">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                <span style="font-weight:600; color:{TEXT_PRIMARY}; font-size:0.88rem;">
-                    Recommendation
-                </span>
+        <div class="st-card" style="border-left:3px solid {border};">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap;">
+                <span style="font-weight:650; color:{TEXT}; font-size:0.9rem;">Recommendation</span>
                 {_badge(priority.upper(), border)}
                 {provenance_badge(provenance)}
             </div>
-            <div style="color:{TEXT_SECONDARY}; font-size:0.82rem; line-height:1.45;">
-                {text}
-            </div>
+            <div style="color:{MUTED}; font-size:0.84rem; line-height:1.5;">{text}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -216,23 +203,14 @@ def delta_card(label: str, original: float, simulated: float, *, fmt: str = ".3f
     colour = DANGER if delta < 0 else SUCCESS
     st.markdown(
         f"""
-        <div style="
-            background:{CARD_BG}; border:1px solid {CARD_BORDER}; border-radius:10px;
-            padding:14px 16px; margin-bottom:10px; box-shadow:{SHADOW};
-        ">
-            <div style="font-size:0.72rem; color:{TEXT_SECONDARY}; text-transform:uppercase;
-                        letter-spacing:0.8px; margin-bottom:6px; font-weight:600;">{label}</div>
-            <div style="display:flex; align-items:baseline; gap:10px;">
-                <span style="font-size:1.1rem; color:{TEXT_PRIMARY};
+        <div class="st-kpi">
+            <div class="st-kpi-label">{label}</div>
+            <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
+                <span class="st-kpi-value" style="font-size:1.1rem;">{original:{fmt}}</span>
+                <span style="color:{MUTED};">→</span>
+                <span class="st-kpi-value" style="font-size:1.1rem;">{simulated:{fmt}}</span>
+                <span style="font-size:0.82rem; font-weight:700; color:{colour};
                              font-family:'JetBrains Mono',monospace;">
-                    {original:{fmt}}
-                </span>
-                <span class="st-compare-arrow">→</span>
-                <span style="font-size:1.1rem; color:{TEXT_PRIMARY};
-                             font-family:'JetBrains Mono',monospace;">
-                    {simulated:{fmt}}
-                </span>
-                <span style="font-size:0.85rem; font-weight:600; color:{colour};">
                     ({sign}{delta:{fmt}})
                 </span>
             </div>
@@ -306,9 +284,9 @@ def disclaimer_banner(text: str = "SIMULATION — not real operational data"):
         f"""
         <div style="
             background:rgba(139,92,246,0.12); border:1px solid #8B5CF6;
-            border-radius:8px; padding:10px 16px; margin-bottom:14px;
-            color:{TEXT_PRIMARY}; font-size:0.82rem; text-align:center;
-            font-weight:600; letter-spacing:0.4px;">
+            border-radius:11px; padding:11px 16px; margin-bottom:14px;
+            color:{TEXT}; font-size:0.84rem; text-align:center;
+            font-weight:650; letter-spacing:0.3px; box-shadow:{SHADOW};">
             ⚠ {text}
         </div>
         """,
@@ -318,12 +296,9 @@ def disclaimer_banner(text: str = "SIMULATION — not real operational data"):
 
 def section_header(title: str, subtitle: str = ""):
     """Section header with optional subtitle."""
-    sub_html = (
-        f'<span style="color:{TEXT_SECONDARY};font-size:0.82rem;margin-left:8px;">{subtitle}</span>'
-        if subtitle else ""
-    )
+    sub_html = f'<span class="st-section-sub">{subtitle}</span>' if subtitle else ""
     st.markdown(
-        f'<h3 style="color:{TEXT_PRIMARY};margin-bottom:4px;">{title}{sub_html}</h3>',
+        f'<div class="st-section-title"><h3>{title}</h3>{sub_html}</div>',
         unsafe_allow_html=True,
     )
     st.markdown("---")
@@ -333,5 +308,18 @@ def skeleton_card():
     """Loading skeleton placeholder for async data."""
     st.markdown(
         '<div class="st-skeleton"></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def page_header(title: str, subtitle: str = "", machine: str | None = None):
+    """Consistent page title block used by every view."""
+    meta_bits = []
+    if machine:
+        meta_bits.append(machine)
+    meta = f" · {' · '.join(meta_bits)}" if meta_bits else ""
+    sub = f'<div class="st-page-sub">{subtitle}{meta}</div>' if subtitle or meta else ""
+    st.markdown(
+        f'<div class="st-page-title">{title}</div>{sub}',
         unsafe_allow_html=True,
     )

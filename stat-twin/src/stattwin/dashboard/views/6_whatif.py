@@ -11,6 +11,7 @@ from stattwin.dashboard.components.cards import (
     delta_card,
     disclaimer_banner,
     kpi_card,
+    page_header,
     provenance_badge,
     section_header,
 )
@@ -81,7 +82,7 @@ def _simulate(sensors: dict, adjustments: dict) -> dict:
 def render() -> None:
     """Render the live What-If Simulator page."""
     machine: str = st.session_state.get("selected_machine", "MACHINE-001")
-    st.markdown(f"# 🔧 What-If Simulator — {machine}")
+    page_header("What-If Simulator", "counterfactual sensitivity · SIMULATION only", machine)
 
     disclaimer_banner(
         "SIMULATION — not real operational data. Results are approximate proxies."
@@ -141,8 +142,9 @@ def render() -> None:
 
     section_header("Sensor Adjustments")
     st.markdown(
-        f"<div style='color:#9CA3AF;font-size:0.82rem;margin-bottom:12px;'>"
-        f"Adjust sensor offsets. Positive = increase, negative = decrease. "
+        f"<div style='color:#9CA3AF;font-size:0.84rem;margin-bottom:12px;"
+        f"font-family:JetBrains Mono,monospace;'>"
+        f"Adjust sensor offsets · + increase · − decrease "
         f"{provenance_badge('SIMULATED')}</div>",
         unsafe_allow_html=True,
     )
@@ -212,12 +214,11 @@ def render() -> None:
             delta_card("SHI", baseline_shi, float(result["shi"]))
         with c2:
             st.markdown(
-                f"<div style='background:#111827;border:1px solid #1F2937;"
-                f"border-radius:10px;padding:14px;text-align:center;'>"
-                f"<div style='font-size:0.72rem;color:#9CA3AF;text-transform:uppercase;"
-                f"letter-spacing:0.6px;margin-bottom:4px;'>State</div>"
-                f"<div style='font-size:0.85rem;color:#F9FAFB;'>{baseline_state} → "
-                f"<b>{result['state']}</b></div></div>",
+                f"<div class='st-kpi' style='text-align:center;'>"
+                f"<div class='st-kpi-label' style='justify-content:center;'>State</div>"
+                f"<div style='font-size:0.95rem;color:#F9FAFB;font-family:'JetBrains Mono',monospace;'>"
+                f"{baseline_state} → <b>{result['state']}</b></div>"
+                f"<div class='st-kpi-delta'>SIMULATED</div></div>",
                 unsafe_allow_html=True,
             )
         with c3:

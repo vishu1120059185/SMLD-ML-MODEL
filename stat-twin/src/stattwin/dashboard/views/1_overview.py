@@ -11,6 +11,7 @@ import streamlit as st
 from stattwin.dashboard.components.cards import (
     freshness_indicator,
     kpi_card,
+    page_header,
     progress_card,
     recommendation_card,
     section_header,
@@ -54,7 +55,7 @@ def _load(name: str, machine: str | None = None):
 def render() -> None:
     """Render the live Overview page."""
     machine: str = st.session_state.get("selected_machine", "MACHINE-001")
-    st.markdown(f"# ⚙ Overview — {machine}")
+    page_header("Overview", "machine health · live risk stream · recommendations", machine)
 
     @st.fragment(run_every=LIVE_INTERVAL)
     def live_overview() -> None:
@@ -84,13 +85,10 @@ def render() -> None:
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.markdown(
-                f"<div style='background:#111827;border:1px solid #1F2937;"
-                f"border-radius:10px;padding:14px 16px;'>"
-                f"<div style='font-size:0.72rem;color:#9CA3AF;text-transform:uppercase;"
-                f"letter-spacing:0.8px;margin-bottom:6px;'>State · live</div>"
-                f"<div style='margin-bottom:4px;'>{state_badge(state)}</div>"
-                f"<div style='font-size:0.68rem;color:#9CA3AF;font-family:"
-                f"'JetBrains Mono',monospace;'>tick #{tick}</div></div>",
+                f"<div class='st-kpi'>"
+                f"<div class='st-kpi-label'>State · live</div>"
+                f"<div style='margin-bottom:6px;'>{state_badge(state)}</div>"
+                f"<div class='st-kpi-delta'>tick #{tick}</div></div>",
                 unsafe_allow_html=True,
             )
         with col2:

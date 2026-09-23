@@ -5,11 +5,14 @@ enableCORS = false
 enableXsrfProtection = false
 
 [theme]
-primaryColor = "#4C8BF5"
-backgroundColor = "#0E1117"
-secondaryBackgroundColor = "#1A1F2E"
-textColor = "#E0E0E0"
-font = "sans serif"
+primaryColor = "#3B82F6"
+backgroundColor = "#0A0E17"
+secondaryBackgroundColor = "#111827"
+textColor = "#F9FAFB"
+base = "dark"
 
 [browser]
 gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"

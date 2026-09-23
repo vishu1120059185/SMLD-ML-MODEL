@@ -7,7 +7,12 @@ from pathlib import Path
 import numpy as np
 import streamlit as st
 
-from stattwin.dashboard.components.cards import evidence_card, provenance_badge, section_header
+from stattwin.dashboard.components.cards import (
+    evidence_card,
+    page_header,
+    provenance_badge,
+    section_header,
+)
 from stattwin.dashboard.components.charts import bar_chart, sparkline
 from stattwin.dashboard.components.live import (
     LIVE_INTERVAL,
@@ -111,7 +116,7 @@ def _demo_sensor_data() -> dict:
 def render() -> None:
     """Render the live Explainability page."""
     machine: str = st.session_state.get("selected_machine", "MACHINE-001")
-    st.markdown(f"# 🔍 Explainability — {machine}")
+    page_header("Explainability", "risk delta · sensor & statistic contributions · evidence", machine)
 
     @st.fragment(run_every=LIVE_INTERVAL)
     def live_explain() -> None:
@@ -155,15 +160,14 @@ def render() -> None:
         timeframe = explanation.get("timeframe", "last 30 days")
         st.markdown(
             f"""
-            <div style="background:#111827;border-left:3px solid #F59E0B;
-                        border-radius:0 10px 10px 0;padding:16px 20px;margin-bottom:14px;">
-                <div style="font-size:0.72rem;color:#9CA3AF;text-transform:uppercase;
-                            letter-spacing:0.6px;margin-bottom:6px;">
-                    Risk Delta: <b style="color:#EF4444;">+{risk_delta:.1%}</b>
+            <div class="st-card" style="border-left:3px solid #F59E0B;">
+                <div class="st-kpi-label">
+                    Risk Delta:
+                    <b style="color:#EF4444;">+{risk_delta:.1%}</b>
                     over <b>{timeframe}</b> · tick #{tick}
                     &nbsp;{provenance_badge('PREDICTED')}
                 </div>
-                <div style="color:#F9FAFB;font-size:0.9rem;line-height:1.5;">
+                <div style="color:#F9FAFB;font-size:0.9rem;line-height:1.55;">
                     {reason}
                 </div>
             </div>
@@ -199,7 +203,8 @@ def render() -> None:
         if types_list:
             st.markdown(
                 f"<div style='margin-top:8px;'>"
-                f"<span style='font-size:0.82rem;color:#9CA3AF;'>"
+                f"<span style='font-size:0.84rem;color:#9CA3AF;"
+                f"font-family:JetBrains Mono,monospace;'>"
                 f"Contribution by statistic type "
                 f"{provenance_badge('PREDICTED')}</span></div>",
                 unsafe_allow_html=True,
@@ -263,7 +268,8 @@ def render() -> None:
                 )
                 with cols[i]:
                     st.markdown(
-                        f"<div style='text-align:center;font-size:0.78rem;color:#9CA3AF;'>"
+                        f"<div style='text-align:center;font-size:0.78rem;color:#9CA3AF;"
+                        f"font-family:JetBrains Mono,monospace;'>"
                         f"{sname} <span style='color:#F59E0B;'>imp={float(imp):.3f}"
                         f"</span></div>",
                         unsafe_allow_html=True,

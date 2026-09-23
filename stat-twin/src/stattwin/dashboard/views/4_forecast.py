@@ -8,7 +8,12 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-from stattwin.dashboard.components.cards import kpi_card, provenance_badge, section_header
+from stattwin.dashboard.components.cards import (
+    kpi_card,
+    page_header,
+    provenance_badge,
+    section_header,
+)
 from stattwin.dashboard.components.charts import gauge_chart, multi_line_chart, timeline_chart
 from stattwin.dashboard.components.live import (
     LIVE_INTERVAL,
@@ -43,7 +48,7 @@ def _load(name: str, machine: str | None = None):
 def render() -> None:
     """Render the live Failure Forecast page."""
     machine: str = st.session_state.get("selected_machine", "MACHINE-001")
-    st.markdown(f"# 🔮 Failure Forecast — {machine}")
+    page_header("Failure Forecast", "P(fail by +h) · RUL · conformal interval · warnings", machine)
 
     @st.fragment(run_every=LIVE_INTERVAL)
     def live_forecast() -> None:
@@ -331,12 +336,11 @@ def render() -> None:
         section_header("Forecast Methodology")
         st.markdown(
             f"""
-            <div style="background:#111827;border:1px solid #1F2937;border-radius:10px;
-                        padding:14px 18px;font-size:0.82rem;color:#9CA3AF;line-height:1.55;">
-                <b style="color:#F9FAFB;">Ensemble approach:</b> Cox PH + RSF + LSTM +
-                Survival SVM combined via stacking. Conformal prediction provides
-                distribution-free coverage guarantees. RUL estimated as conditional
-                expected lifetime given current state.
+            <div class="st-card" style="font-size:0.84rem;color:#9CA3AF;line-height:1.55;">
+                <b style="color:#F9FAFB;">Ensemble approach:</b> multi-horizon heads
+                (+10…+50 cycles) with isotonic probability calibration and split-conformal
+                RUL intervals (α = 0.10 target · 90%). Contributions are described as
+                <i>contributed to the model's risk estimate</i>, never as causal failure claims.
                 {provenance_badge('PREDICTED')}
             </div>
             """,

@@ -7,58 +7,51 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import copy
+
 import numpy as np
 import plotly.graph_objects as go
 
-# ── Colour palette (matches app.py industrial dark theme) ──────────────────
-BG = "#0A0E17"
-PAPER = "#111827"
-GRID = "#1F2937"
-TEXT = "#F9FAFB"
-ACCENT = "#3B82F6"
-SUCCESS = "#10B981"
-WARNING = "#F59E0B"
-DANGER = "#EF4444"
+from stattwin.dashboard.components.theme import (
+    ACCENT,
+    BG,
+    BORDER,
+    CARD,
+    MONO,
+    PLOTLY_LAYOUT,
+    PROVENANCE_COLORS,
+    PROVENANCE_DASH,
+    STATE_COLORS,
+    TEXT,
+)
 
-STATE_COLORS = {
-    "HEALTHY": SUCCESS,
-    "WATCH": WARNING,
-    "DEGRADING": "#F97316",
-    "CRITICAL": DANGER,
-    "FAILURE-LIKELY": "#991B1B",
-}
+# Back-compat aliases
+PAPER = CARD
+GRID = BORDER
+MUTED_OR = "#9CA3AF"
 
-PROVENANCE_COLORS = {
-    "OBSERVED": ACCENT,
-    "PREDICTED": WARNING,
-    "SIMULATED": "#8B5CF6",
-}
-
-PROVENANCE_DASH = {
-    "OBSERVED": "solid",
-    "PREDICTED": "dot",
-    "SIMULATED": "dash",
-}
+__all__ = [
+    "STATE_COLORS",
+    "PROVENANCE_COLORS",
+    "PROVENANCE_DASH",
+    "timeline_chart",
+    "gauge_chart",
+    "heatmap_chart",
+    "bar_chart",
+    "multi_line_chart",
+    "donut_chart",
+    "sparkline",
+    "forest_plot",
+]
 
 
 def _layout(title: str = "", height: int = 400) -> dict:
-    return dict(
-        template="plotly_dark",
-        paper_bgcolor=PAPER,
-        plot_bgcolor=BG,
-        font=dict(color=TEXT, family="JetBrains Mono, Fira Code, monospace"),
-        title=dict(text=title, font=dict(size=15)),
-        height=height,
-        margin=dict(l=50, r=30, t=45, b=40),
-        xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),
-        yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),
-        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
-        hovermode="x unified",
-        hoverlabel=dict(
-            bgcolor=PAPER,
-            bordercolor=GRID,
-            font=dict(color=TEXT, family="JetBrains Mono, Fira Code, monospace", size=12),
-        ),
+    layout = copy.deepcopy(PLOTLY_LAYOUT)
+    layout["title"] = dict(
+        text=title,
+        font=dict(size=14, color=TEXT, family=MONO),
+        x=0.01,
+        xanchor="left",
     )
 
 
@@ -72,13 +65,16 @@ def timeline_chart(
     extra_traces: list[go.Scatter] | None = None,
     state_changes: list[dict] | None = None,
     provenance: str | None = None,
+    color: str | None = None,
 ) -> go.Figure:
     """Line chart with optional rolling bands and state-change shading."""
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=list(timestamps), y=list(values),
         mode="lines", name="Value",
-        line=dict(color=ACCENT, width=1.5),
+        line=dict(color=color or ACCENT, width=1.75, shape="spline", smoothing=0.4),
+        fill="tozeroy" if color is None and not bands else None,
+        fillcolor="rgba(59,130,246,0.06)" if color is None and not bands else None,
     ))
 
     if bands:
@@ -86,6 +82,7 @@ def timeline_chart(
             fig.add_trace(go.Scatter(
                 x=list(timestamps), y=list(band.get("upper", [])),
                 mode="lines", line=dict(width=0), showlegend=False,
+                hoverinfo="skip",
             ))
             fig.add_trace(go.Scatter(
                 x=list(timestamps), y=list(band.get("lower", [])),
@@ -99,21 +96,22 @@ def timeline_chart(
             fig.add_trace(t)
 
     if state_changes:
-        colors = {
+        fills = {
             "HEALTHY": "rgba(16,185,129,0.08)",
-            "WATCH": "rgba(245,158,11,0.08)",
-            "DEGRADING": "rgba(249,115,22,0.10)",
-            "CRITICAL": "rgba(239,68,68,0.12)",
-            "FAILURE-LIKELY": "rgba(153,27,27,0.14)",
+            "WATCH": "rgba(245,158,11,0.09)",
+            "DEGRADING": "rgba(249,115,22,0.11)",
+            "CRITICAL": "rgba(239,68,68,0.13)",
+            "FAILURE-LIKELY": "rgba(153,27,27,0.15)",
         }
         for sc in state_changes:
             fig.add_vrect(
                 x0=sc["start"], x1=sc["end"],
-                fillcolor=colors.get(sc["state"], "rgba(0,0,0,0)"),
+                fillcolor=fills.get(sc["state"], "rgba(0,0,0,0)"),
                 layer="below", line_width=0,
                 annotation_text=sc["state"],
                 annotation_position="top left",
                 annotation_font_size=9,
+                annotation_font_color=TEXT,
             )
 
     if provenance:
@@ -121,7 +119,8 @@ def timeline_chart(
         title = f"{title}  <span style='color:{prov_color};font-size:11px;'>[{provenance}]</span>"
 
     layout = _layout(title, height=380)
-    layout["yaxis"]["title"] = y_label
+    if y_label:
+        layout["yaxis"]["title"] = dict(text=y_label, font=dict(size=11, color=TEXT, family=MONO))
     fig.update_layout(**layout)
     return fig
 
@@ -129,27 +128,34 @@ def timeline_chart(
 def gauge_chart(value: float, title: str = "SHI", max_val: float = 1.0) -> go.Figure:
     """Semi-circular gauge with color-coded thresholds."""
     fig = go.Figure(go.Indicator(
-        mode="gauge+number",
+        mode="gauge+number+delta" if max_val else "gauge+number",
         value=value,
-        number=dict(suffix="", font=dict(size=28)),
+        number=dict(suffix="", font=dict(size=26, color=TEXT, family=MONO)),
         gauge=dict(
-            axis=dict(range=[0, max_val], tickwidth=1),
-            bar=dict(color=ACCENT),
-            bgcolor=PAPER,
+            axis=dict(range=[0, max_val], tickwidth=1, tickcolor="#374151"),
+            bar=dict(color=ACCENT, thickness=0.55),
+            bgcolor=CARD,
             borderwidth=0,
             steps=[
-                dict(range=[0, 0.25], color="#10B981"),
-                dict(range=[0.25, 0.50], color="#F59E0B"),
-                dict(range=[0.50, 0.75], color="#F97316"),
-                dict(range=[0.75, 1.0], color="#EF4444"),
+                dict(range=[0, 0.25], color="#0F3D2C"),
+                dict(range=[0.25, 0.50], color="#3D3210"),
+                dict(range=[0.50, 0.75], color="#3D2410"),
+                dict(range=[0.75, 1.0], color="#3D1218"),
             ],
+            threshold=dict(
+                line=dict(color=TEXT, width=3),
+                thickness=0.75,
+                value=min(value, max_val),
+            ),
         ),
-        title=dict(text=title, font=dict(size=14)),
+        title=dict(text=title, font=dict(size=13, color=MUTED_OR, family=MONO)),
     ))
     fig.update_layout(
-        paper_bgcolor=PAPER,
-        font=dict(color=TEXT, family="JetBrains Mono, Fira Code, monospace"),
-        height=260, margin=dict(l=30, r=30, t=40, b=10),
+        paper_bgcolor=CARD,
+        font=dict(color=TEXT, family=MONO),
+        height=250,
+        margin=dict(l=28, r=28, t=42, b=8),
+        showlegend=False,
     )
     return fig
 
@@ -165,6 +171,7 @@ def heatmap_chart(
         z=z, x=list(x_labels), y=list(y_labels),
         colorscale=colorscale, reversescale=False,
         hoverongaps=False,
+        colorbar=dict(tickfont=dict(family=MONO, size=10), outlinewidth=0),
     ))
     layout = _layout(title, height=400)
     fig.update_layout(**layout)
@@ -185,15 +192,22 @@ def bar_chart(
             y=list(categories), x=list(values),
             orientation="h",
             marker_color=color or ACCENT,
+            marker_line=dict(width=0),
+            hovertemplate="%{y}: %{x:.3f}<extra></extra>",
         ))
+        layout = _layout(title, height=max(300, 42 * len(list(categories))))
+        layout["xaxis"]["title"] = dict(text=y_label, font=dict(size=11, color=TEXT, family=MONO)) if y_label else layout["xaxis"].get("title")
     else:
         fig = go.Figure(go.Bar(
             x=list(categories), y=list(values),
             marker_color=color or ACCENT,
+            marker_line=dict(width=0),
+            hovertemplate="%{x}: %{y:.3f}<extra></extra>",
         ))
-    layout = _layout(title, height=350)
-    layout["yaxis"]["title"] = y_label
-    fig.update_layout(**layout)
+        layout = _layout(title, height=350)
+        if y_label:
+            layout["yaxis"]["title"] = dict(text=y_label, font=dict(size=11, color=TEXT, family=MONO))
+    fig.update_layout(bargap=0.35, **layout)
     return fig
 
 
@@ -212,11 +226,12 @@ def multi_line_chart(
             line=dict(
                 color=td.get("color", ACCENT),
                 dash=td.get("dash", "solid"),
-                width=1.8,
+                width=2.0,
             ),
         ))
     layout = _layout(title, height=380)
-    layout["yaxis"]["title"] = y_label
+    if y_label:
+        layout["yaxis"]["title"] = dict(text=y_label, font=dict(size=11, color=TEXT, family=MONO))
     fig.update_layout(**layout)
     return fig
 
@@ -230,33 +245,38 @@ def donut_chart(
 ) -> go.Figure:
     fig = go.Figure(go.Pie(
         labels=list(labels), values=list(values),
-        hole=0.55,
-        marker=dict(colors=list(colors) if colors else None),
-        textfont=dict(size=11),
+        hole=0.58,
+        marker=dict(colors=list(colors) if colors else None, line=dict(color=CARD, width=2)),
+        textfont=dict(size=11, family=MONO),
+        hovertemplate="%{label}: %{value}<extra></extra>",
     ))
     fig.update_layout(
-        paper_bgcolor=PAPER,
-        font=dict(color=TEXT, family="JetBrains Mono, Fira Code, monospace"),
-        title=dict(text=title, font=dict(size=14)),
+        paper_bgcolor=CARD,
+        font=dict(color=TEXT, family=MONO),
+        title=dict(text=title, font=dict(size=14, color=TEXT, family=MONO)),
         height=320,
-        margin=dict(l=20, r=20, t=40, b=20),
+        margin=dict(l=20, r=20, t=44, b=20),
         showlegend=True,
+        legend=dict(font=dict(size=11, color=MUTED_OR)),
     )
     return fig
 
 
-def sparkline(values: Sequence[float], *, height: int = 80, color: str = ACCENT) -> go.Figure:
+def sparkline(values: Sequence[float], *, height: int = 78, color: str = ACCENT) -> go.Figure:
+    arr = np.asarray(list(values), dtype=float)
     fig = go.Figure(go.Scatter(
-        y=list(values), mode="lines",
-        line=dict(color=color, width=1.2),
-        fill="tozeroy", fillcolor="rgba(59,130,246,0.10)",
+        y=arr.tolist(), mode="lines",
+        line=dict(color=color, width=1.4),
+        fill="tozeroy",
+        fillcolor=f"{color}1A",
+        hoverinfo="skip",
     ))
     fig.update_layout(
-        paper_bgcolor=PAPER, plot_bgcolor=BG,
+        paper_bgcolor=CARD, plot_bgcolor=BG,
         height=height,
-        margin=dict(l=5, r=5, t=5, b=5),
+        margin=dict(l=4, r=4, t=4, b=4),
         xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
+        yaxis=dict(visible=False, range=[float(arr.min()) - 1e-9, float(arr.max()) + 1e-9] if arr.size else None),
         showlegend=False,
     )
     return fig

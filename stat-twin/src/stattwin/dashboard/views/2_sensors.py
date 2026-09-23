@@ -8,7 +8,12 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-from stattwin.dashboard.components.cards import kpi_card, provenance_badge, section_header
+from stattwin.dashboard.components.cards import (
+    kpi_card,
+    page_header,
+    provenance_badge,
+    section_header,
+)
 from stattwin.dashboard.components.charts import sparkline, timeline_chart
 from stattwin.dashboard.components.live import (
     LIVE_INTERVAL,
@@ -60,7 +65,7 @@ def _ewma(values: np.ndarray, alpha: float) -> np.ndarray:
 def render() -> None:
     """Render the live Sensor Monitoring page."""
     machine: str = st.session_state.get("selected_machine", "MACHINE-001")
-    st.markdown(f"# 📡 Sensor Monitoring — {machine}")
+    page_header("Sensor Monitoring", "raw · rolling · EWMA · z-score · DQ flags", machine)
 
     sensor_data = _load("sensor_data.json", machine)
     demo_mode = sensor_data is None
@@ -219,7 +224,8 @@ def render() -> None:
             with spark_cols[i]:
                 st.markdown(
                     f"<div style='text-align:center;font-size:0.72rem;"
-                    f"color:#9CA3AF;'>{sname}</div>",
+                    f"color:#9CA3AF;font-family:JetBrains Mono,monospace;"
+                    f"letter-spacing:0.5px;'>{sname}</div>",
                     unsafe_allow_html=True,
                 )
                 st.plotly_chart(

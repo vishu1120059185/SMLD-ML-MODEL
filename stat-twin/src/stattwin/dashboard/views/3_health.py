@@ -8,7 +8,12 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from stattwin.dashboard.components.cards import kpi_card, section_header, state_badge
+from stattwin.dashboard.components.cards import (
+    kpi_card,
+    page_header,
+    section_header,
+    state_badge,
+)
 from stattwin.dashboard.components.charts import heatmap_chart, timeline_chart
 from stattwin.dashboard.components.live import (
     LIVE_INTERVAL,
@@ -87,7 +92,7 @@ def _demo_z_heatmap() -> dict:
 def render() -> None:
     """Render the live Statistical Health page."""
     machine: str = st.session_state.get("selected_machine", "MACHINE-001")
-    st.markdown(f"# 🏥 Statistical Health — {machine}")
+    page_header("Statistical Health", "SHI · state bands · z heatmap · shift tables", machine)
 
     @st.fragment(run_every=LIVE_INTERVAL)
     def live_health() -> None:
@@ -163,11 +168,11 @@ def render() -> None:
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown(
-                f"<div style='background:#111827;border:1px solid #1F2937;"
-                f"border-radius:10px;padding:14px;text-align:center;'>"
-                f"<div style='font-size:0.72rem;color:#9CA3AF;text-transform:uppercase;"
-                f"letter-spacing:0.8px;margin-bottom:6px;'>Current State · live</div>"
-                f"{state_badge(state)}</div>",
+                f"<div class='st-kpi' style='text-align:center;'>"
+                f"<div class='st-kpi-label' style='justify-content:center;'>"
+                f"Current State · live</div>"
+                f"{state_badge(state)}"
+                f"<div class='st-kpi-delta'>tick #{tick}</div></div>",
                 unsafe_allow_html=True,
             )
         with c2:

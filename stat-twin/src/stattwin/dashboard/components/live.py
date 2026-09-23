@@ -26,11 +26,6 @@ import streamlit as st
 LIVE_INTERVAL = "2s"
 LIVE_INTERVAL_MS = 2000
 
-CARD_BG = "#111827"
-BORDER = "#1F2937"
-MUTED = "#9CA3AF"
-DANGER = "#EF4444"
-
 DEFAULT_FEED = "live stream @ 2s (baseline = artifacts / demo)"
 
 

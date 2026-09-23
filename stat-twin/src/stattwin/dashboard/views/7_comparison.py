@@ -9,7 +9,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from stattwin.dashboard.components.cards import kpi_card, provenance_badge, section_header
+from stattwin.dashboard.components.cards import (
+    kpi_card,
+    page_header,
+    provenance_badge,
+    section_header,
+)
 from stattwin.dashboard.components.charts import bar_chart
 from stattwin.dashboard.components.live import LIVE_INTERVAL, current_tick, live_status
 
@@ -71,7 +76,7 @@ def _demo_comparison() -> dict:
 def render() -> None:
     """Render the live Model Comparison page."""
     machine: str = st.session_state.get("selected_machine", "MACHINE-001")
-    st.markdown(f"# 📊 Model Comparison — {machine}")
+    page_header("Model Comparison", "metrics · calibration · ablation · generalization", machine)
 
     @st.fragment(run_every=LIVE_INTERVAL)
     def live_comparison() -> None:
@@ -230,9 +235,7 @@ def render() -> None:
                 if len(c_indices) > 1:
                     delta_full = c_indices[0] - c_indices[-1]
                     st.markdown(
-                        f"<div style='background:#111827;border:1px solid #1F2937;"
-                        f"border-radius:10px;padding:12px 16px;font-size:0.82rem;"
-                        f"color:#9CA3AF;'>"
+                        f"<div class='st-card' style='font-size:0.84rem;'>"
                         f"Full model vs no-EWMA: "
                         f"<b style='color:#F9FAFB;'>Δ={delta_full:+.3f}</b> "
                         f"C-index &nbsp;{provenance_badge('PREDICTED')}</div>",
