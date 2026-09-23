@@ -555,7 +555,7 @@ This project is licensed under the **MIT License**.
 <div align="center">
 
 **Vishwesh Penkar · Daksh Patil**  
-*Guidance: Rashmi Sartkar*  
+*Guidance: Rashmi Saratkar*  
 AIML — SMLD ML MODEL
 
 [![GitHub](https://img.shields.io/badge/GitHub-SMLD--ML--MODEL-181717?logo=github)](https://github.com/vishu1120059185/SMLD-ML-MODEL)
