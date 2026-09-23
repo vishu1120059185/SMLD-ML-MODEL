@@ -5,9 +5,8 @@ and provenance badge support for chart titles.
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 import copy
+from collections.abc import Sequence
 
 import numpy as np
 import plotly.graph_objects as go
@@ -53,6 +52,8 @@ def _layout(title: str = "", height: int = 400) -> dict:
         x=0.01,
         xanchor="left",
     )
+    layout["height"] = height
+    return layout
 
 
 def timeline_chart(
@@ -196,7 +197,10 @@ def bar_chart(
             hovertemplate="%{y}: %{x:.3f}<extra></extra>",
         ))
         layout = _layout(title, height=max(300, 42 * len(list(categories))))
-        layout["xaxis"]["title"] = dict(text=y_label, font=dict(size=11, color=TEXT, family=MONO)) if y_label else layout["xaxis"].get("title")
+        if y_label:
+            layout["xaxis"]["title"] = dict(
+                text=y_label, font=dict(size=11, color=TEXT, family=MONO)
+            )
     else:
         fig = go.Figure(go.Bar(
             x=list(categories), y=list(values),
@@ -206,7 +210,9 @@ def bar_chart(
         ))
         layout = _layout(title, height=350)
         if y_label:
-            layout["yaxis"]["title"] = dict(text=y_label, font=dict(size=11, color=TEXT, family=MONO))
+            layout["yaxis"]["title"] = dict(
+                text=y_label, font=dict(size=11, color=TEXT, family=MONO)
+            )
     fig.update_layout(bargap=0.35, **layout)
     return fig
 
@@ -276,7 +282,10 @@ def sparkline(values: Sequence[float], *, height: int = 78, color: str = ACCENT)
         height=height,
         margin=dict(l=4, r=4, t=4, b=4),
         xaxis=dict(visible=False),
-        yaxis=dict(visible=False, range=[float(arr.min()) - 1e-9, float(arr.max()) + 1e-9] if arr.size else None),
+        yaxis=dict(
+            visible=False,
+            range=[float(arr.min()) - 1e-9, float(arr.max()) + 1e-9] if arr.size else None,
+        ),
         showlegend=False,
     )
     return fig
@@ -298,8 +307,8 @@ def forest_plot(
         error_x=dict(
             type="data",
             symmetric=False,
-            array=[hi - m for m, hi in zip(means, ci_hi)],
-            arrayminus=[m - lo for m, lo in zip(means, ci_lo)],
+            array=[hi - m for m, hi in zip(means, ci_hi, strict=False)],
+            arrayminus=[m - lo for m, lo in zip(means, ci_lo, strict=False)],
         ),
         mode="markers",
         marker=dict(color=ACCENT, size=10),

@@ -2,14 +2,12 @@
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
 
 import numpy as np
 import streamlit as st
 
 from stattwin.dashboard.components.cards import (
-    freshness_indicator,
     kpi_card,
     page_header,
     progress_card,

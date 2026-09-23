@@ -140,6 +140,10 @@ def kpi_card(
             <div class="st-kpi-label">{label_html}{prov_html}</div>
             <div class="st-kpi-value">{value}</div>
             {delta_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def evidence_card(
@@ -160,7 +164,8 @@ def evidence_card(
     st.markdown(
         f"""
         <div class="st-card" style="border-left:3px solid {border};">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px;
+                        margin-bottom:5px; flex-wrap:wrap;">
                 <span style="font-weight:650; color:{TEXT}; font-size:0.9rem;">{title}</span>
                 {provenance_badge(provenance)}
                 {sensor_html}
@@ -184,7 +189,8 @@ def recommendation_card(
     st.markdown(
         f"""
         <div class="st-card" style="border-left:3px solid {border};">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px;
+                        margin-bottom:5px; flex-wrap:wrap;">
                 <span style="font-weight:650; color:{TEXT}; font-size:0.9rem;">Recommendation</span>
                 {_badge(priority.upper(), border)}
                 {provenance_badge(provenance)}

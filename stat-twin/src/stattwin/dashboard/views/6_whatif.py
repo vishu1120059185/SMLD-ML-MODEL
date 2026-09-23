@@ -216,7 +216,8 @@ def render() -> None:
             st.markdown(
                 f"<div class='st-kpi' style='text-align:center;'>"
                 f"<div class='st-kpi-label' style='justify-content:center;'>State</div>"
-                f"<div style='font-size:0.95rem;color:#F9FAFB;font-family:'JetBrains Mono',monospace;'>"
+                f"<div style='font-size:0.95rem;color:#F9FAFB;"
+                f"font-family:\"JetBrains Mono\",monospace;'>"
                 f"{baseline_state} → <b>{result['state']}</b></div>"
                 f"<div class='st-kpi-delta'>SIMULATED</div></div>",
                 unsafe_allow_html=True,

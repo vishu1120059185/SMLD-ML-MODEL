@@ -116,7 +116,11 @@ def _demo_sensor_data() -> dict:
 def render() -> None:
     """Render the live Explainability page."""
     machine: str = st.session_state.get("selected_machine", "MACHINE-001")
-    page_header("Explainability", "risk delta · sensor & statistic contributions · evidence", machine)
+    page_header(
+        "Explainability",
+        "risk delta · sensor & statistic contributions · evidence",
+        machine,
+    )
 
     @st.fragment(run_every=LIVE_INTERVAL)
     def live_explain() -> None:
