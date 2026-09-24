@@ -12,7 +12,7 @@ All metrics are computed per unit and aggregated (mean ± std).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -400,7 +400,7 @@ def quality_report(
     if not mono.empty:
         mono_vals = mono["monotonicity"].dropna()
         if len(mono_vals) > 0:
-            lines.append(f"Monotonicity:")
+            lines.append("Monotonicity:")
             lines.append(f"  Mean: {mono_vals.mean():.{decimals}f}")
             lines.append(f"  Std:  {mono_vals.std():.{decimals}f}")
             lines.append(f"  Min:  {mono_vals.min():.{decimals}f}")
@@ -420,7 +420,7 @@ def quality_report(
     if not spearman.empty:
         rho_vals = spearman["spearman_rho"].dropna()
         if len(rho_vals) > 0:
-            lines.append(f"Spearman RUL Correlation:")
+            lines.append("Spearman RUL Correlation:")
             lines.append(f"  Mean: {rho_vals.mean():.{decimals}f}")
             lines.append(f"  Std:  {rho_vals.std():.{decimals}f}")
             lines.append(f"  Min:  {rho_vals.min():.{decimals}f}")

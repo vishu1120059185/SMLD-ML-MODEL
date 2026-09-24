@@ -16,8 +16,6 @@ Provides subcommands that map 1-to-1 to Makefile targets::
 
 from __future__ import annotations
 
-from typing import Optional
-
 import typer
 
 from .config import STATTWINConfig, load_config
@@ -63,6 +61,39 @@ def _write_run_manifest(
         extras["profile"] = profile
     manifest_path = write_manifest(out, cfg, config_path, extras=extras)
     logger.info("Manifest written to %s", manifest_path)
+
+
+def _run_experiment(
+    module_name: str,
+    *,
+    ds: str = "FD001",
+    profile: str | None = None,
+    config: str = "configs/base.yaml",
+) -> None:
+    """Invoke a real experiment module (same entry point as the Makefile)."""
+    import importlib
+    import sys
+
+    module = f"stattwin.experiments.{module_name}"
+    argv_backup = sys.argv[:]
+    try:
+        sys.argv = [module, "--ds", ds, "--config", config]
+        if profile:
+            sys.argv.extend(["--profile", profile])
+        logger.info("Running experiment module %s", module)
+        mod = importlib.import_module(module)
+        if hasattr(mod, "main"):
+            raise SystemExit(mod.main())
+        raise SystemExit(0)
+    except ModuleNotFoundError as exc:
+        logger.error("Experiment module not found: %s (%s)", module, exc)
+        raise typer.Exit(code=1) from exc
+    except SystemExit as exc:
+        if exc.code not in (0, None):
+            logger.error("Experiment %s failed with code %s", module, exc.code)
+            raise
+    finally:
+        sys.argv = argv_backup
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +177,7 @@ def e0(
     cfg = _common_options(ds, profile, config)
     logger.info("e0_data_audit: ds=%s", cfg.dataset.name)
     _write_run_manifest("e0_data_audit", cfg, config, profile)
+    _run_experiment("e0_data_audit", ds=ds, profile=profile, config=config)
 
 
 @app.command("e1")
@@ -158,6 +190,7 @@ def e1(
     cfg = _common_options(ds, profile, config)
     logger.info("e1_health_index: ds=%s", cfg.dataset.name)
     _write_run_manifest("e1_health_index", cfg, config, profile)
+    _run_experiment("e1_health_index", ds=ds, profile=profile, config=config)
 
 
 @app.command("e2")
@@ -170,6 +203,7 @@ def e2(
     cfg = _common_options(ds, profile, config)
     logger.info("e2_model_comparison: ds=%s", cfg.dataset.name)
     _write_run_manifest("e2_model_comparison", cfg, config, profile)
+    _run_experiment("e2_model_comparison", ds=ds, profile=profile, config=config)
 
 
 @app.command("e3")
@@ -182,6 +216,7 @@ def e3(
     cfg = _common_options(ds, profile, config)
     logger.info("e3_early_warning: ds=%s", cfg.dataset.name)
     _write_run_manifest("e3_early_warning", cfg, config, profile)
+    _run_experiment("e3_early_warning", ds=ds, profile=profile, config=config)
 
 
 @app.command("e4")
@@ -194,6 +229,7 @@ def e4(
     cfg = _common_options(ds, profile, config)
     logger.info("e4_ablation: ds=%s", cfg.dataset.name)
     _write_run_manifest("e4_ablation", cfg, config, profile)
+    _run_experiment("e4_ablation", ds=ds, profile=profile, config=config)
 
 
 @app.command("e5")
@@ -206,6 +242,7 @@ def e5(
     cfg = _common_options(ds, profile, config)
     logger.info("e5_uncertainty: ds=%s", cfg.dataset.name)
     _write_run_manifest("e5_uncertainty", cfg, config, profile)
+    _run_experiment("e5_uncertainty", ds=ds, profile=profile, config=config)
 
 
 @app.command("e6")
@@ -215,8 +252,9 @@ def e6(
 ) -> None:
     """E6 – Generalisation across FD001–FD004 (all datasets)."""
     cfg = _common_options("FD001", profile, config)
-    logger.info("e6_generalisation")
-    _write_run_manifest("e6_generalisation", cfg, config, profile)
+    logger.info("e6_generalization")
+    _write_run_manifest("e6_generalization", cfg, config, profile)
+    _run_experiment("e6_generalization", ds="FD001", profile=profile, config=config)
 
 
 @app.command("e7")
@@ -228,6 +266,7 @@ def e7(
     cfg = _common_options("FD001", profile, config)
     logger.info("e7_operating_conditions")
     _write_run_manifest("e7_operating_conditions", cfg, config, profile)
+    _run_experiment("e7_operating_conditions", ds="FD001", profile=profile, config=config)
 
 
 @app.command("e8")
@@ -240,6 +279,7 @@ def e8(
     cfg = _common_options(ds, profile, config)
     logger.info("e8_fault_injection: ds=%s", cfg.dataset.name)
     _write_run_manifest("e8_fault_injection", cfg, config, profile)
+    _run_experiment("e8_fault_injection", ds=ds, profile=profile, config=config)
 
 
 @app.command("e9")
@@ -252,6 +292,7 @@ def e9(
     cfg = _common_options(ds, profile, config)
     logger.info("e9_uncertainty_comparison: ds=%s", cfg.dataset.name)
     _write_run_manifest("e9_uncertainty_comparison", cfg, config, profile)
+    _run_experiment("e9_uncertainty_comparison", ds=ds, profile=profile, config=config)
 
 
 @app.command("app-data")
@@ -259,11 +300,16 @@ def app_data(
     ds: str = typer.Option("FD001", "--ds"),
     profile: str = typer.Option("fast", "--profile"),
     config: str = typer.Option("configs/base.yaml", "--config"),
+    machine: str = typer.Option("MACHINE-001", "--machine"),
 ) -> None:
-    """Build dashboard artefacts (parquet caches, model exports)."""
+    """Build dashboard artefacts from C-MAPSS (SHI, forecast, DQ, guidance)."""
+    from .app_data import build_artifacts
+
     cfg = _common_options(ds, profile, config)
-    logger.info("app-data command: ds=%s", cfg.dataset.name)
+    logger.info("app-data: ds=%s machine=%s", cfg.dataset.name, machine)
+    written = build_artifacts(cfg.dataset.name, machine)
     _write_run_manifest("app_data", cfg, config, profile)
+    logger.info("app-data: wrote %d artifacts", len(written))
 
 
 @app.command("app")
@@ -308,12 +354,35 @@ def run_test() -> None:
 def reproduce(
     profile: str = typer.Option("full", "--profile"),
     config: str = typer.Option("configs/base.yaml", "--config"),
+    ds: str = typer.Option("FD001", "--ds"),
+    with_dashboard: bool = typer.Option(
+        True, "--with-dashboard/--skip-dashboard",
+        help="Also rebuild dashboard artifacts (app-data).",
+    ),
 ) -> None:
-    """Full end-to-end pipeline: data -> features -> train -> eval."""
-    cfg = _common_options("FD001", profile, config)
-    logger.info("reproduce command: profile=%s", profile)
-    _write_run_manifest("reproduce", cfg, config, profile)
-    logger.info("reproduce: skeleton complete – wire pipeline steps as they are built")
+    """Full end-to-end pipeline: e0→e5, e8, app-data."""
+    cfg = _common_options(ds, profile, config)
+    logger.info("reproduce: profile=%s ds=%s", profile, cfg.dataset.name)
+    steps = [
+        "e0_data_audit",
+        "e1_health_index",
+        "e2_model_comparison",
+        "e3_early_warning",
+        "e4_ablation",
+        "e5_uncertainty",
+        "e8_fault_injection",
+    ]
+    for step in steps:
+        logger.info("reproduce step: %s", step)
+        _write_run_manifest(step, cfg, config, profile)
+        _run_experiment(step, ds=ds, profile=profile, config=config)
+    if with_dashboard:
+        logger.info("reproduce step: app-data")
+        from .app_data import build_artifacts
+
+        build_artifacts(ds, "MACHINE-001")
+        _write_run_manifest("app_data", cfg, config, profile)
+    logger.info("reproduce: complete")
 
 
 if __name__ == "__main__":

@@ -13,17 +13,15 @@ Responsibilities
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
 
 from stattwin.data.schema import (
-    COLUMN_NAMES,
     FAILURE_HORIZONS,
     OP_SETTINGS,
-    SENSOR_NAMES,
     label_col_for,
 )
 from stattwin.data.splitter import validate_dataset
@@ -62,7 +60,7 @@ class TelemetryDataset:
         return self._df_cache  # type: ignore[attr-defined]
 
     @property
-    def shape(self) -> Tuple[int, int]:
+    def shape(self) -> tuple[int, int]:
         return self._df.shape
 
     @property
@@ -96,7 +94,7 @@ class TelemetryDataset:
         return any(label_col_for(h) in self._df.columns for h in FAILURE_HORIZONS)
 
     @property
-    def failure_horizons(self) -> List[int]:
+    def failure_horizons(self) -> list[int]:
         """Horizons for which labels are currently available."""
         return [h for h in FAILURE_HORIZONS if label_col_for(h) in self._df.columns]
 
@@ -109,7 +107,7 @@ class TelemetryDataset:
         *,
         include_settings: bool = True,
         include_sensors: bool = True,
-        sensor_indices: Optional[Sequence[int]] = None,
+        sensor_indices: Sequence[int] | None = None,
     ) -> pd.DataFrame:
         """Return the feature sub-DataFrame.
 
@@ -124,7 +122,7 @@ class TelemetryDataset:
             If *None* and ``include_sensors`` is True, all 21 sensors are
             returned.
         """
-        cols: List[str] = []
+        cols: list[str] = []
         if include_settings:
             cols.extend(OP_SETTINGS)
         if include_sensors:
@@ -162,7 +160,7 @@ class TelemetryDataset:
             raise KeyError(f"Unit {unit_id} not found.")
         return self._df.loc[mask].sort_values("cycle")
 
-    def units(self, unit_ids: Sequence[int]) -> "TelemetryDataset":
+    def units(self, unit_ids: Sequence[int]) -> TelemetryDataset:
         """Return a new ``TelemetryDataset`` containing only the listed units."""
         mask = self._df["unit_id"].isin(unit_ids)
         if not mask.any():
@@ -176,7 +174,7 @@ class TelemetryDataset:
         self,
         train_units: np.ndarray,
         val_units: np.ndarray,
-    ) -> Tuple["TelemetryDataset", "TelemetryDataset"]:
+    ) -> tuple[TelemetryDataset, TelemetryDataset]:
         """Split into two ``TelemetryDataset`` objects by unit ID sets.
 
         Returns
@@ -191,7 +189,7 @@ class TelemetryDataset:
             )
         return self.units(train_units), self.units(val_units)
 
-    def copy(self) -> "TelemetryDataset":
+    def copy(self) -> TelemetryDataset:
         """Return a deep copy of this dataset."""
         return TelemetryDataset(df=self._df.copy(), name=self.name)
 

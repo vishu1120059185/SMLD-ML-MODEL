@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
-import pytest
 
-from stattwin.data.synthetic import make_synthetic_dataset
 from stattwin.data.splitter import make_group_kfold_splits
 from stattwin.uncertainty.conformal import conformal_intervals
 
@@ -15,7 +12,7 @@ class TestCalibrationDisjoint:
     def test_calibration_and_test_disjoint(self, synthetic_dataset):
         """Conformal calibration data must not overlap with test data."""
         splits = make_group_kfold_splits(synthetic_dataset, n_splits=3)
-        rng = np.random.default_rng(42)
+        np.random.default_rng(42)
 
         for i, s in enumerate(splits):
             train_units = set(s["train_units"])
@@ -51,8 +48,8 @@ class TestCalibrationDisjoint:
 
             # Calibration: first half of training
             n_cal = len(train_df) // 2
-            cal_idx = train_df.index[:n_cal]
-            proper_train_idx = train_df.index[n_cal:]
+            train_df.index[:n_cal]
+            train_df.index[n_cal:]
 
             y_cal_true = rng.normal(50, 10, n_cal)
             y_cal_pred = y_cal_true + rng.normal(0, 3, n_cal)

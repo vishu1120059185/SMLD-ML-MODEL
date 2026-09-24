@@ -16,7 +16,6 @@ This module provides:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -78,7 +77,7 @@ class LeadTimeReport:
     n_false_early: int = 0
     n_false_alarm: int = 0
     far: float = np.nan
-    lead_times: List[float] = field(default_factory=list)
+    lead_times: list[float] = field(default_factory=list)
     mean_lead_time: float = np.nan
     median_lead_time: float = np.nan
     min_lead_time: float = np.nan
@@ -91,12 +90,12 @@ class LeadTimeReport:
 
 def _detect_warnings_for_unit(
     proba_series: np.ndarray,
-    failure_cycle: Optional[int],
+    failure_cycle: int | None,
     total_cycles: int,
     tau: float,
     persistence: int,
     warning_horizon: int,
-) -> Tuple[Optional[int], bool, bool]:
+) -> tuple[int | None, bool, bool]:
     """Detect warnings for a single unit's probability time-series.
 
     Parameters
@@ -129,8 +128,8 @@ def _detect_warnings_for_unit(
 
     # Find runs of consecutive True values
     consecutive = 0
-    first_above: Optional[int] = None
-    warning_cycle: Optional[int] = None
+    first_above: int | None = None
+    warning_cycle: int | None = None
 
     for i in range(len(above_threshold)):
         if above_threshold[i]:
@@ -150,11 +149,9 @@ def _detect_warnings_for_unit(
     is_false_alarm = failure_cycle is None
 
     is_false_early = False
-    if failure_cycle is not None:
-        # Warning is false-early if failure occurs more than H_w cycles
-        # AFTER the warning cycle.
-        if failure_cycle > warning_cycle + warning_horizon:
-            is_false_early = True
+    # Warning is false-early if failure occurs more than H_w cycles AFTER warning.
+    if failure_cycle is not None and failure_cycle > warning_cycle + warning_horizon:
+        is_false_early = True
 
     return warning_cycle, is_false_early, is_false_alarm
 
@@ -207,10 +204,10 @@ def lead_time_analysis(
     warned_units: set = set()
     false_early_units: set = set()
     false_alarm_units: set = set()
-    lead_times_list: List[float] = []
+    lead_times_list: list[float] = []
 
     # Build per-unit failure cycle lookup
-    failure_map: Dict = {}
+    failure_map: dict = {}
     for uid, grp in df.groupby(unit_col):
         fc_vals = grp[failure_cycle_col].dropna()
         if len(fc_vals) > 0:
@@ -272,14 +269,14 @@ def lead_time_analysis(
 def tune_tau_for_budget(
     df_val: pd.DataFrame,
     far_budget: float = 0.05,
-    tau_grid: Optional[np.ndarray] = None,
+    tau_grid: np.ndarray | None = None,
     warning_horizon: int = 20,
     persistence: int = 3,
     unit_col: str = "unit_id",
     cycle_col: str = "cycle",
     proba_col: str = "fail_prob",
     failure_cycle_col: str = "failure_cycle",
-) -> Tuple[float, LeadTimeReport]:
+) -> tuple[float, LeadTimeReport]:
     """Tune the warning threshold *tau* on a validation set to meet a FAR budget.
 
     Performs a grid search over candidate *tau* values and returns the

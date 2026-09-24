@@ -21,7 +21,7 @@ References
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -70,11 +70,11 @@ class AnomalyModel(BaseModel):
         self.persistence = persistence
         self.contamination = contamination
 
-        self._sensor_cols: List[str] = []
+        self._sensor_cols: list[str] = []
         self._baseline_mean: np.ndarray | None = None
         self._inv_cov: np.ndarray | None = None
         self._threshold: float = 0.0
-        self._isotonic_probas: Dict[int, IsotonicRegression] = {}
+        self._isotonic_probas: dict[int, IsotonicRegression] = {}
         self._isotonic_rul: IsotonicRegression | None = None
 
     # ------------------------------------------------------------------
@@ -126,7 +126,7 @@ class AnomalyModel(BaseModel):
     def _raw_to_probas(self, raw: pd.Series) -> pd.DataFrame:
         """Map Mahalanobis distance to per-horizon probabilities."""
         raw_vals = raw.to_numpy().reshape(-1, 1)
-        proba_dict: Dict[str, np.ndarray] = {}
+        proba_dict: dict[str, np.ndarray] = {}
         for h in self.horizons:
             iso = self._isotonic_probas.get(h)
             if iso is not None:
@@ -182,7 +182,7 @@ class AnomalyModel(BaseModel):
         self,
         X_train: pd.DataFrame,
         y_train: pd.DataFrame,
-        groups: Optional[np.ndarray] = None,
+        groups: np.ndarray | None = None,
     ) -> AnomalyModel:
         """Fit robust Mahalanobis reference and isotonic calibrators.
 

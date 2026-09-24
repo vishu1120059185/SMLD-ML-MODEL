@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 
-from stattwin.data.synthetic import make_synthetic_dataset
 from stattwin.data.splitter import make_group_kfold_splits
+from stattwin.data.synthetic import make_synthetic_dataset
 
 
 class TestDeterminism:
@@ -27,7 +26,7 @@ class TestDeterminism:
         """Same seed produces identical splits."""
         splits1 = make_group_kfold_splits(synthetic_dataset, n_splits=3, seed=42)
         splits2 = make_group_kfold_splits(synthetic_dataset, n_splits=3, seed=42)
-        for s1, s2 in zip(splits1, splits2):
+        for s1, s2 in zip(splits1, splits2, strict=False):
             np.testing.assert_array_equal(s1["train_units"], s2["train_units"])
             np.testing.assert_array_equal(s1["val_units"], s2["val_units"])
 
@@ -40,9 +39,8 @@ class TestDeterminism:
     def test_metrics_deterministic(self, synthetic_dataset):
         """Same data and seed produce identical metric results."""
         from stattwin.health.shi import compute_shi
-        from stattwin.health.quality import compute_quality_metrics
 
-        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]
+        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]  # noqa: E501
 
         hi1 = compute_shi(synthetic_dataset, sensor_cols=sensor_cols, baseline_cycles=20)
         hi2 = compute_shi(synthetic_dataset, sensor_cols=sensor_cols, baseline_cycles=20)

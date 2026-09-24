@@ -85,9 +85,15 @@ def inject_css() -> None:
     st.markdown(_CSS, unsafe_allow_html=True)
 
 
+_FONT_IMPORT = (
+    "@import url('https://fonts.googleapis.com/css2?"
+    "family=Inter:wght@400;500;600;700;800"
+    "&family=JetBrains+Mono:wght@400;500;600;700&display=swap');"
+)
+
 _CSS = f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+{_FONT_IMPORT}
 
 :root {{
   --bg: {BG};

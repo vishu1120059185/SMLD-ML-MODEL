@@ -9,17 +9,16 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import time
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from stattwin.config import STATTWINConfig, load_config
 from stattwin.data.loader import load_cmapss
-from stattwin.data.schema import COLUMN_NAMES, FAILURE_HORIZONS, OP_SETTINGS, label_col_for
+from stattwin.data.schema import FAILURE_HORIZONS, label_col_for
 from stattwin.manifest import write_manifest
 
 # ---------------------------------------------------------------------------
@@ -69,7 +68,7 @@ def experiment_setup(args: argparse.Namespace) -> tuple[STATTWINConfig, pd.DataF
     if not raw_path.exists():
         raise FileNotFoundError(
             f"Raw C-MAPSS file not found: {raw_path}\n"
-            f"Download from https://www.nasa.gov/content/prognostics-center-of-excellence-data-set-repository\n"
+            f"Download from https://www.nasa.gov/content/prognostics-center-of-excellence-data-set-repository\n"  # noqa: E501
             f"and place '{cfg.dataset.name}.txt' in data/raw/CMAPSS/"
         )
 
@@ -140,7 +139,7 @@ class Timer:
         self.end: float = 0.0
         self.elapsed: float = 0.0
 
-    def __enter__(self) -> "Timer":
+    def __enter__(self) -> Timer:
         self.start = time.perf_counter()
         return self
 

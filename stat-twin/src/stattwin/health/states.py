@@ -21,10 +21,9 @@ Two threshold variants are supported:
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
 import pandas as pd

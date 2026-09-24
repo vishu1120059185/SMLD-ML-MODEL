@@ -14,8 +14,9 @@ evaluation and calibration.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -47,10 +48,10 @@ class ModelResult:
 
     proba: pd.DataFrame
     rul: pd.Series
-    raw_score: Optional[pd.Series] = None
+    raw_score: pd.Series | None = None
     fold: int = -1
     model_name: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class BaseModel(ABC):
@@ -73,7 +74,7 @@ class BaseModel(ABC):
         horizons: Sequence[int] | None = None,
         name: str = "BaseModel",
     ) -> None:
-        self.horizons: List[int] = list(horizons or FAILURE_HORIZONS)
+        self.horizons: list[int] = list(horizons or FAILURE_HORIZONS)
         self.name = name
         self.is_fitted: bool = False
 
@@ -86,8 +87,8 @@ class BaseModel(ABC):
         self,
         X_train: pd.DataFrame,
         y_train: pd.DataFrame,
-        groups: Optional[np.ndarray] = None,
-    ) -> "BaseModel":
+        groups: np.ndarray | None = None,
+    ) -> BaseModel:
         """Fit the model on training data.
 
         Parameters
@@ -167,7 +168,7 @@ class BaseModel(ABC):
         self,
         X: pd.DataFrame,
         fold: int = -1,
-        metadata: Dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ModelResult:
         """Build a ``ModelResult`` from predictions.
 

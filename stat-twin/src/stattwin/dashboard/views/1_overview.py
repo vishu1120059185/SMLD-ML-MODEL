@@ -1,12 +1,10 @@
 """Page 1 — OVERVIEW: machine health at a glance, live 2s auto-refresh."""
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import numpy as np
 import streamlit as st
 
+from stattwin.dashboard.components.artifacts import load_artifact as _load
 from stattwin.dashboard.components.cards import (
     kpi_card,
     page_header,
@@ -28,26 +26,8 @@ from stattwin.dashboard.components.live import (
     state_from_shi,
 )
 
-RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
-
 # Timestamp of last artifact load for freshness tracking
 _last_load_key = "_overview_last_load"
-
-
-def _load(name: str, machine: str | None = None):
-    """Load JSON artifact; try machine dir first, then global, then root results."""
-    candidates = []
-    if machine:
-        candidates.append(RESULTS_DIR / machine / name)
-    candidates.append(RESULTS_DIR / "global" / name)
-    candidates.append(RESULTS_DIR / name)
-    for p in candidates:
-        if p.exists():
-            try:
-                return json.loads(p.read_text())
-            except Exception:
-                continue
-    return None
 
 
 def render() -> None:
@@ -78,7 +58,8 @@ def render() -> None:
         rul_base = float(forecast.get("rul", 45.0)) if forecast else 45.0
         rul = rul_countdown(rul_base, tick)
         rul_ci = forecast.get("rul_ci", [None, None]) if forecast else [None, None]
-        prov = "OBSERVED" if health else "SIMULATED"
+        prov_health = "OBSERVED" if health else "SIMULATED"
+        prov_pred = "PREDICTED" if forecast else "SIMULATED"
 
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -94,15 +75,15 @@ def render() -> None:
                 "SHI",
                 f"{shi:.3f}",
                 delta=f"live · tick #{tick}",
-                provenance=prov,
+                provenance=prov_health,
                 tooltip="Statistical Health Index: 0 (healthy) to 1 (degraded)",
             )
         with col3:
             kpi_card(
-                "P(Failure +30d)",
+                "P(Failure +30 cycles)",
                 f"{fp:.1%}",
                 delta="live · simulated stream",
-                provenance="PREDICTED",
+                provenance=prov_pred,
                 tooltip="Probability of failure within the next 30 cycles",
             )
         with col4:
@@ -112,10 +93,10 @@ def render() -> None:
                 else ""
             )
             kpi_card(
-                "RUL (days)",
+                "RUL (cycles)",
                 f"{rul:.1f} {ci_str}".strip(),
                 delta="counting down · live",
-                provenance="PREDICTED",
+                provenance=prov_pred,
                 tooltip="Remaining Useful Life: predicted cycles until failure",
             )
 
@@ -197,10 +178,16 @@ def render() -> None:
             st.info("Data-quality metrics not available in results/.")
 
         section_header("Recommendations")
-        if recommendations:
-            recs = (
-                recommendations if isinstance(recommendations, list) else [recommendations]
-            )
+        recs = _recommendations_from_guidance(
+            machine=machine,
+            health=health,
+            forecast=forecast,
+            dq=dq,
+            state=state,
+            shi=shi,
+            recommendations=recommendations,
+        )
+        if recs:
             for rec in recs[:3]:
                 recommendation_card(
                     rec.get("text", str(rec)),
@@ -219,7 +206,7 @@ def render() -> None:
             "Remaining Useful Life",
             rul,
             maximum=rul_base if rul_base > 0 else 100.0,
-            suffix=" days",
+            suffix=" cycles",
         )
 
         section_header("SHI Over Time")
@@ -248,3 +235,65 @@ def render() -> None:
         st.plotly_chart(fig, width="stretch", key=f"ov_shi_{tick}")
 
     live_overview()
+
+
+def _recommendations_from_guidance(
+    *,
+    machine: str,
+    health: dict | None,
+    forecast: dict | None,
+    dq: dict | None,
+    state: str,
+    shi: float,
+    recommendations: dict | list | None,
+) -> list[dict]:
+    """Prefer artifact recommendations; else derive via decision.guidance."""
+    if recommendations:
+        recs = (
+            recommendations if isinstance(recommendations, list) else [recommendations]
+        )
+        return [r for r in recs if isinstance(r, dict)]
+
+    try:
+        import pandas as pd
+
+        from stattwin.decision.guidance import RiskThresholds, generate_maintenance_guidance
+
+        p30 = float(forecast.get("failure_prob_30", 0.0)) if forecast else 0.0
+        dq_overall = float(dq.get("overall", 1.0)) if dq else 1.0
+        if dq_overall >= 0.95:
+            dq_status = "OK"
+        elif dq_overall >= 0.80:
+            dq_status = "DEGRADED"
+        else:
+            dq_status = "POOR"
+
+        guidance = generate_maintenance_guidance(
+            unit_id=machine,
+            cycle=int(forecast.get("cycle", 0)) if forecast else 0,
+            proba=pd.DataFrame([{"fail_h30": p30}]),
+            horizons=[30],
+            health_state=state,
+            shi=shi,
+            dq_status=dq_status,
+            thresholds=RiskThresholds(),
+        )
+        prio = {
+            "Critical": "high",
+            "High": "high",
+            "Medium": "medium",
+            "Low": "low",
+        }.get(guidance.risk_tier.value, "medium")
+        return [
+            {
+                "text": (
+                    f"[{guidance.risk_tier.value}] {guidance.recommendation} "
+                    f"(rule: {guidance.rule_triggered or 'n/a'} · "
+                    f"confidence: {guidance.confidence_level})"
+                ),
+                "priority": prio,
+                "provenance": "PREDICTED",
+            }
+        ]
+    except Exception:
+        return []

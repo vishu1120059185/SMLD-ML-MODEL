@@ -17,11 +17,11 @@ from __future__ import annotations
 
 import argparse
 import copy
-import json
 from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -30,13 +30,12 @@ import pandas as pd
 from stattwin.config import load_config
 from stattwin.data.loader import load_cmapss
 from stattwin.data.schema import FAILURE_HORIZONS, label_col_for
-from stattwin.data.splitter import make_group_kfold_splits, inner_unit_split
+from stattwin.data.splitter import inner_unit_split, make_group_kfold_splits
 from stattwin.evaluation.metrics import interval_metrics
-from stattwin.models import RandomForestModel, XGBoostModel
+from stattwin.models import XGBoostModel
 from stattwin.uncertainty.conformal import conformal_intervals
 
 from ._common import (
-    SENSOR_COLS,
     Timer,
     add_common_args,
     feature_columns,
@@ -44,7 +43,6 @@ from ._common import (
     save_json,
     setup_output,
 )
-
 
 # ---------------------------------------------------------------------------
 # Uncertainty methods
@@ -130,7 +128,7 @@ def _bootstrap_pi(
     rng = np.random.default_rng(seed)
     test_preds = []
 
-    for b in range(n_bootstraps):
+    for _b in range(n_bootstraps):
         # Resample training data
         idx = rng.integers(0, len(X_train), size=len(X_train))
         X_boot = X_train.iloc[idx].copy()
@@ -211,8 +209,8 @@ def _compare_uncertainty_methods(
         rul_cal = m.predict_rul(X_cal[available + ["unit_id", "cycle"]]).values
         rul_val = m.predict_rul(X_val[available + ["unit_id", "cycle"]]).values
 
-        rul_cal_true = X_cal["RUL"].values.astype(float) if "RUL" in X_cal.columns else rul_cal.astype(float)
-        rul_val_true = X_val["RUL"].values.astype(float) if "RUL" in X_val.columns else rul_val.astype(float)
+        rul_cal_true = X_cal["RUL"].values.astype(float) if "RUL" in X_cal.columns else rul_cal.astype(float)  # noqa: E501
+        rul_val_true = X_val["RUL"].values.astype(float) if "RUL" in X_val.columns else rul_val.astype(float)  # noqa: E501
 
         # 1. Split conformal
         sigma_cal = np.abs(rul_cal - rul_cal.mean()) + 1.0
@@ -227,17 +225,17 @@ def _compare_uncertainty_methods(
         # 2. Ensemble variance (simulate with 3 perturbations)
         preds_ens = []
         for noise_scale in [0.02, 0.05, 0.1]:
-            noisy_pred = rul_val + np.random.default_rng(42).normal(0, noise_scale, size=len(rul_val))
+            noisy_pred = rul_val + np.random.default_rng(42).normal(0, noise_scale, size=len(rul_val))  # noqa: E501
             preds_ens.append(noisy_pred)
         ens = _ensemble_variance(preds_ens, alpha)
-        im_ens = interval_metrics(rul_val_true, np.array(ens["lower"]), np.array(ens["upper"]), alpha)
+        im_ens = interval_metrics(rul_val_true, np.array(ens["lower"]), np.array(ens["upper"]), alpha)  # noqa: E501
         method_results["ensemble_variance"].append({
             "picp": im_ens.picp, "mean_width": im_ens.mean_width, "winkler": im_ens.winkler,
         })
 
         # 3. Quantile bootstrap
         qboot = _quantile_regression(rul_val_true, rul_val.astype(float), alpha)
-        im_qb = interval_metrics(rul_val_true, np.array(qboot["lower"]), np.array(qboot["upper"]), alpha)
+        im_qb = interval_metrics(rul_val_true, np.array(qboot["lower"]), np.array(qboot["upper"]), alpha)  # noqa: E501
         method_results["quantile_bootstrap"].append({
             "picp": im_qb.picp, "mean_width": im_qb.mean_width, "winkler": im_qb.winkler,
         })
@@ -248,7 +246,7 @@ def _compare_uncertainty_methods(
             X_val, available, n_bootstraps=30, alpha=alpha, seed=42,
         )
         if "error" not in boot:
-            im_boot = interval_metrics(rul_val_true, np.array(boot["lower"]), np.array(boot["upper"]), alpha)
+            im_boot = interval_metrics(rul_val_true, np.array(boot["lower"]), np.array(boot["upper"]), alpha)  # noqa: E501
             method_results["bootstrap"].append({
                 "picp": im_boot.picp, "mean_width": im_boot.mean_width, "winkler": im_boot.winkler,
             })
@@ -380,7 +378,7 @@ def main() -> None:
     out_dir = setup_output("e9_uncertainty_comparison")
 
     with Timer() as t:
-        results = run_e9(cfg, df, out_dir)
+        run_e9(cfg, df, out_dir)
 
     print(f"\n[e9] Completed in {t.elapsed:.1f}s")
     print(f"     Output: {out_dir}")

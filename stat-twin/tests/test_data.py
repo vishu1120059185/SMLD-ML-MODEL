@@ -20,7 +20,6 @@ from stattwin.data.splitter import (
 )
 from stattwin.data.synthetic import make_synthetic_dataset, make_synthetic_unit
 
-
 # ---------------------------------------------------------------------------
 # Schema
 # ---------------------------------------------------------------------------

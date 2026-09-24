@@ -1,13 +1,11 @@
 """Page 2 — SENSOR MONITORING: live signals, rolling stats, EWMA, Z-scores."""
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
+from stattwin.dashboard.components.artifacts import load_artifact as _load
 from stattwin.dashboard.components.cards import (
     kpi_card,
     page_header,
@@ -22,23 +20,6 @@ from stattwin.dashboard.components.live import (
     live_status,
     live_window,
 )
-
-RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
-
-
-def _load(name: str, machine: str | None = None):
-    candidates = []
-    if machine:
-        candidates.append(RESULTS_DIR / machine / name)
-    candidates.append(RESULTS_DIR / "global" / name)
-    candidates.append(RESULTS_DIR / name)
-    for p in candidates:
-        if p.exists():
-            try:
-                return json.loads(p.read_text())
-            except Exception:
-                continue
-    return None
 
 
 def _rolling(values: np.ndarray, window: int) -> tuple[np.ndarray, np.ndarray]:

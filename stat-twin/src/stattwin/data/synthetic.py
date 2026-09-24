@@ -10,16 +10,12 @@ tests deterministic, fast, and dependency-free.
 
 from __future__ import annotations
 
-from typing import List, Optional, Sequence
-
 import numpy as np
 import pandas as pd
 
 from stattwin.data.schema import (
     COLUMN_NAMES,
     FAILURE_HORIZONS,
-    OP_SETTINGS,
-    SENSOR_NAMES,
     label_col_for,
 )
 
@@ -33,7 +29,7 @@ def make_synthetic_unit(
     n_sensors: int = 5,
     drift_slope: float = 0.01,
     noise_std: float = 0.05,
-    regime_length: Optional[int] = None,
+    regime_length: int | None = None,
     seed: int = 42,
 ) -> pd.DataFrame:
     """Generate a single synthetic engine run-to-failure trajectory.
@@ -122,7 +118,7 @@ def make_synthetic_dataset(
     n_sensors: int = 5,
     drift_slope: float = 0.01,
     noise_std: float = 0.05,
-    regime_length: Optional[int] = None,
+    regime_length: int | None = None,
     seed: int = 42,
 ) -> pd.DataFrame:
     """Generate a multi-unit synthetic dataset.
@@ -151,7 +147,7 @@ def make_synthetic_dataset(
         Concatenated DataFrame of all units, sorted by ``(unit_id, cycle)``.
     """
     rng = np.random.default_rng(seed)
-    frames: List[pd.DataFrame] = []
+    frames: list[pd.DataFrame] = []
 
     for uid in range(1, n_units + 1):
         n_cyc = int(rng.integers(n_cycles_range[0], n_cycles_range[1] + 1))

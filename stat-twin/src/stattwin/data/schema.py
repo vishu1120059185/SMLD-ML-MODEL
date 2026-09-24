@@ -9,13 +9,13 @@ header and contain 26 columns:
 
 from __future__ import annotations
 
-from typing import Final, List
+from typing import Final
 
 # ---------------------------------------------------------------------------
 # 26 columns as they appear in the raw C-MAPSS text files
 # ---------------------------------------------------------------------------
 
-COLUMN_NAMES: Final[List[str]] = [
+COLUMN_NAMES: Final[list[str]] = [
     "unit_id",
     "cycle",
     "op_setting_1",
@@ -55,7 +55,7 @@ SENSOR_NAMES: Final[dict[str, str]] = {
 }
 
 # Operational setting column names (convenience)
-OP_SETTINGS: Final[List[str]] = [
+OP_SETTINGS: Final[list[str]] = [
     "op_setting_1",
     "op_setting_2",
     "op_setting_3",
@@ -65,7 +65,7 @@ OP_SETTINGS: Final[List[str]] = [
 # Failure horizons for binary degradation labels
 # ---------------------------------------------------------------------------
 
-FAILURE_HORIZONS: Final[List[int]] = [10, 20, 30, 40, 50]
+FAILURE_HORIZONS: Final[list[int]] = [10, 20, 30, 40, 50]
 """Horizons *h* at which we define ``y_h = 1[rul <= h]``."""
 
 # Column name template for the binary failure label at a given horizon

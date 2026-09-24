@@ -307,28 +307,38 @@ def generate_maintenance_guidance(
 
     # State-based overrides
     state_upper = health_state.upper() if health_state else ""
+    state_forced = False
     if state_upper in thresholds.state_override_critical:
         tier = RiskTier.CRITICAL
         rule = f"Health state '{health_state}' triggers CRITICAL tier"
+        state_forced = True
     elif state_upper in thresholds.state_override_high:
         if tier.severity_rank < RiskTier.HIGH.severity_rank:
             tier = RiskTier.HIGH
             rule = f"Health state '{health_state}' triggers HIGH tier"
+            state_forced = True
 
-    # P(+30)-based assignment (only if state didn't already set Critical)
-    if tier.severity_rank < RiskTier.CRITICAL.severity_rank:
+    # P(+30)-based assignment (never downgrades a state-forced tier)
+    if not state_forced or tier.severity_rank < RiskTier.CRITICAL.severity_rank:
+        p30_tier = RiskTier.LOW
+        p30_rule = f"P(+30)={p30:.3f} < {thresholds.p30_low} (Low threshold)"
         if p30 >= thresholds.p30_critical:
-            tier = RiskTier.CRITICAL
-            rule = f"P(+30)={p30:.3f} >= {thresholds.p30_critical} (Critical threshold)"
+            p30_tier = RiskTier.CRITICAL
+            p30_rule = (
+                f"P(+30)={p30:.3f} >= {thresholds.p30_critical} (Critical threshold)"
+            )
         elif p30 >= thresholds.p30_medium:
-            tier = RiskTier.HIGH
-            rule = f"P(+30)={p30:.3f} >= {thresholds.p30_medium} (High threshold)"
+            p30_tier = RiskTier.HIGH
+            p30_rule = f"P(+30)={p30:.3f} >= {thresholds.p30_medium} (High threshold)"
         elif p30 >= thresholds.p30_low:
-            tier = RiskTier.MEDIUM
-            rule = f"P(+30)={p30:.3f} >= {thresholds.p30_low} (Medium threshold)"
-        else:
-            tier = RiskTier.LOW
-            rule = f"P(+30)={p30:.3f} < {thresholds.p30_low} (Low threshold)"
+            p30_tier = RiskTier.MEDIUM
+            p30_rule = f"P(+30)={p30:.3f} >= {thresholds.p30_low} (Medium threshold)"
+
+        if p30_tier.severity_rank > tier.severity_rank:
+            tier = p30_tier
+            rule = p30_rule
+        elif not state_forced:
+            rule = p30_rule
 
     # DQ adjustment
     tier_adj, confidence = _adjust_confidence(tier, dq_status)

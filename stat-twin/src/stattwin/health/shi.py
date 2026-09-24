@@ -22,8 +22,8 @@ on training data.  The healthy baseline is the first K cycles of each unit.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
-from typing import Any, Literal
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -221,10 +221,10 @@ def compute_shi(
     # Step 1: Degradation directions (vectorized per sensor)
     degradation_directions: dict[str, int] = {}
     for col in sensor_cols:
-        def _unit_spearman(group):
+        def _unit_spearman(group, _col: str = col):
             if len(group) < 5:
                 return np.nan
-            rho, _ = sp_stats.spearmanr(group[cycle_col].values, group[col].values)
+            rho, _ = sp_stats.spearmanr(group[cycle_col].values, group[_col].values)
             return rho
         rhos = df_sorted.groupby(unit_col).apply(_unit_spearman, include_groups=False)
         rhos = rhos.dropna()
@@ -249,10 +249,10 @@ def compute_shi(
     # Step 3: Sensor informativeness weights (vectorized)
     sensor_weights: dict[str, float] = {}
     for col in sensor_cols:
-        def _unit_rho_rul(group):
+        def _unit_rho_rul(group, _col: str = col):
             if len(group) < 5 or "RUL" not in group.columns:
                 return np.nan
-            rho, _ = sp_stats.spearmanr(group["RUL"].values, group[col].values)
+            rho, _ = sp_stats.spearmanr(group["RUL"].values, group[_col].values)
             return abs(rho) if not np.isnan(rho) else np.nan
         rhos = df_sorted.groupby(unit_col).apply(_unit_rho_rul, include_groups=False)
         rhos = rhos.dropna()
@@ -284,9 +284,7 @@ def compute_shi(
                     raw = _compute_trend(values, bl_std, deg_sign)
                 elif ec.name == "ewma":
                     raw = _compute_ewma(values, alpha=ewma_alpha)
-                elif ec.name == "variance":
-                    raw = _compute_variance(values, window=variance_window)
-                elif ec.name == "corr_shift":
+                elif ec.name == "variance" or ec.name == "corr_shift":
                     raw = _compute_variance(values, window=variance_window)
                 else:
                     raw = np.zeros_like(values)
@@ -323,7 +321,7 @@ def compute_shi(
                 if (ec.name, col) in ecdf_params and unit in raw_evidence[ec.name]:
                     ecdf_vals, ecdf_probs = ecdf_params[(ec.name, col)]
                     raw = raw_evidence[ec.name][unit][col]
-                    norm = _ecdf_transform(raw, ecdf_vals, ecdf_probs, ecdf_clamp_low, ecdf_clamp_high)
+                    norm = _ecdf_transform(raw, ecdf_vals, ecdf_probs, ecdf_clamp_low, ecdf_clamp_high)  # noqa: E501
                     normalised_evidence[ec.name][unit][col] = norm
                 else:
                     n = len(df_sorted[df_sorted[unit_col] == unit])
@@ -337,7 +335,7 @@ def compute_shi(
         unit_data = df_sorted[df_sorted[unit_col] == unit]
         n_cycles = len(unit_data)
         shi_unit = np.zeros(n_cycles, dtype=np.float64)
-        evidence_unit = {ec.name: np.zeros(n_cycles, dtype=np.float64) for ec in evidence_components}
+        evidence_unit = {ec.name: np.zeros(n_cycles, dtype=np.float64) for ec in evidence_components}  # noqa: E501
 
         for ec in evidence_components:
             weighted_sum = np.zeros(n_cycles, dtype=np.float64)
@@ -348,10 +346,7 @@ def compute_shi(
                     weighted_sum += omega * normalised_evidence[ec.name][unit][col]
                     weight_sum += omega
 
-            if weight_sum > 0:
-                aggregated = weighted_sum / weight_sum
-            else:
-                aggregated = np.full(n_cycles, 0.5)
+            aggregated = weighted_sum / weight_sum if weight_sum > 0 else np.full(n_cycles, 0.5)
 
             evidence_unit[ec.name] = aggregated
             shi_unit += weights[ec.name] * aggregated

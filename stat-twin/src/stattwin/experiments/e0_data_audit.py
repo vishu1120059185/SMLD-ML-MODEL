@@ -12,30 +12,28 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from stattwin.data.loader import load_cmapss
-from stattwin.data.schema import COLUMN_NAMES, OP_SETTINGS, SENSOR_NAMES
+from stattwin.data.schema import OP_SETTINGS
 
 from ._common import (
     SENSOR_COLS,
     Timer,
     add_common_args,
-    ensure_dir,
     resolve_raw_path,
     save_json,
     setup_output,
 )
-
 
 # ---------------------------------------------------------------------------
 # Audit helpers
@@ -250,7 +248,7 @@ def run_e0(cfg, df, out_dir) -> dict[str, Any]:
 def main() -> None:
     """CLI entry-point for e0_data_audit."""
     parser = argparse.ArgumentParser(
-        description="E0: Data Audit – load subsets, unit counts, cycle distributions, constant sensors."
+        description="E0: Data Audit – load subsets, unit counts, cycle distributions, constant sensors."  # noqa: E501
     )
     add_common_args(parser)
     args = parser.parse_args()
@@ -263,7 +261,7 @@ def main() -> None:
     if not raw_path.exists():
         print(f"ERROR: Raw file not found: {raw_path}", file=sys.stderr)
         print(
-            "Download from https://www.nasa.gov/content/prognostics-center-of-excellence-data-set-repository\n"
+            "Download from https://www.nasa.gov/content/prognostics-center-of-excellence-data-set-repository\n"  # noqa: E501
             f"and place '{cfg.dataset.name}.txt' in data/raw/CMAPSS/",
             file=sys.stderr,
         )

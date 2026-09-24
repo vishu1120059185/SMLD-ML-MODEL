@@ -16,7 +16,8 @@ References
 
 from __future__ import annotations
 
-from typing import List, Optional, Literal, Sequence
+from collections.abc import Sequence
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -164,7 +165,7 @@ class _LSTMNetwork(nn.Module):
 
 def _build_sequences(
     df: pd.DataFrame,
-    sensor_cols: List[str],
+    sensor_cols: list[str],
     seq_len: int,
     unit_col: str = _UNIT_COL,
     cycle_col: str = _CYCLE_COL,
@@ -312,14 +313,14 @@ class GRUModel(BaseModel):
             self.device = device
 
         self._net: _GRUNetwork | _LSTMNetwork | None = None
-        self._sensor_cols: List[str] = []
+        self._sensor_cols: list[str] = []
         self._input_size: int = 0
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _select_features(self, X: pd.DataFrame) -> List[str]:
+    def _select_features(self, X: pd.DataFrame) -> list[str]:
         """Return raw sensor columns only."""
         return [
             c for c in X.columns
@@ -414,7 +415,7 @@ class GRUModel(BaseModel):
         self,
         X_train: pd.DataFrame,
         y_train: pd.DataFrame,
-        groups: Optional[np.ndarray] = None,
+        groups: np.ndarray | None = None,
     ) -> GRUModel:
         """Fit the GRU/LSTM model on sequence data.
 
@@ -471,7 +472,7 @@ class GRUModel(BaseModel):
         best_state = None
         patience_counter = 0
 
-        for epoch in range(self.epochs):
+        for _epoch in range(self.epochs):
             _train_loss = self._train_epoch(loader, self._net, optimizer, bce_loss, mse_loss)
             val_loss, _, _ = self._evaluate(loader, self._net, bce_loss, mse_loss)
             scheduler.step(val_loss)

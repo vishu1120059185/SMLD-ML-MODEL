@@ -12,7 +12,6 @@ This module provides:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 import numpy as np
 from sklearn.metrics import (
@@ -73,10 +72,10 @@ class ClassificationReport:
 
 
 def evaluate_classification(
-    y_true_dict: Dict[int, np.ndarray],
-    y_prob_dict: Dict[int, np.ndarray],
-    horizons: Optional[List[int]] = None,
-) -> List[ClassificationReport]:
+    y_true_dict: dict[int, np.ndarray],
+    y_prob_dict: dict[int, np.ndarray],
+    horizons: list[int] | None = None,
+) -> list[ClassificationReport]:
     """Evaluate per-horizon binary classification performance.
 
     Parameters
@@ -96,7 +95,7 @@ def evaluate_classification(
     if horizons is None:
         horizons = FAILURE_HORIZONS
 
-    reports: List[ClassificationReport] = []
+    reports: list[ClassificationReport] = []
     for h in horizons:
         if h not in y_true_dict or h not in y_prob_dict:
             reports.append(ClassificationReport(horizon=h))
@@ -244,13 +243,13 @@ class ProbabilisticReport:
     mean_brier: float = np.nan
     mean_ece_ew: float = np.nan
     mean_ece_em: float = np.nan
-    per_horizon: Dict[int, float] = field(default_factory=dict)
+    per_horizon: dict[int, float] = field(default_factory=dict)
 
 
 def probabilistic_metrics(
-    y_true_dict: Dict[int, np.ndarray],
-    y_prob_dict: Dict[int, np.ndarray],
-    horizons: Optional[List[int]] = None,
+    y_true_dict: dict[int, np.ndarray],
+    y_prob_dict: dict[int, np.ndarray],
+    horizons: list[int] | None = None,
 ) -> ProbabilisticReport:
     """Compute aggregate Brier and ECE scores across horizons.
 
@@ -272,9 +271,9 @@ def probabilistic_metrics(
     if horizons is None:
         horizons = FAILURE_HORIZONS
 
-    brier_dict: Dict[int, float] = {}
-    ece_ew_vals: List[float] = []
-    ece_em_vals: List[float] = []
+    brier_dict: dict[int, float] = {}
+    ece_ew_vals: list[float] = []
+    ece_em_vals: list[float] = []
 
     for h in horizons:
         if h not in y_true_dict or h not in y_prob_dict:

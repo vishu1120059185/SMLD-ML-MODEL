@@ -22,7 +22,8 @@ References
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional, Sequence
+from collections.abc import Sequence
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -59,9 +60,9 @@ class _TabularFallback:
         self.max_depth = max_depth
         self.learning_rate = learning_rate
         self.random_state = random_state
-        self._classifiers: Dict[int, Any] = {}
+        self._classifiers: dict[int, Any] = {}
         self._regressor: Any = None
-        self._feature_cols: List[str] = []
+        self._feature_cols: list[str] = []
 
     def fit(
         self,
@@ -111,7 +112,7 @@ class _TabularFallback:
 
     def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
         X_arr = X[self._feature_cols].to_numpy(dtype=np.float64)
-        proba_dict: Dict[str, np.ndarray] = {}
+        proba_dict: dict[str, np.ndarray] = {}
         for h in FAILURE_HORIZONS:
             clf = self._classifiers.get(h)
             if clf is not None:
@@ -136,7 +137,7 @@ class _TabularFallback:
 # -----------------------------------------------------------------------
 
 
-def _enforce_monotone(proba: pd.DataFrame, horizons: List[int]) -> pd.DataFrame:
+def _enforce_monotone(proba: pd.DataFrame, horizons: list[int]) -> pd.DataFrame:
     """Enforce P(+10) <= P(+20) <= ... <= P(+50) per row.
 
     Uses a cumulative-maximum from right to left (highest horizon first)
@@ -236,16 +237,16 @@ class HybridModel(BaseModel):
 
         self._ensemble: list[_GRUNetwork | _LSTMNetwork] = []
         self._tabular: _TabularFallback | None = None
-        self._sensor_cols: List[str] = []
-        self._stat_cols: List[str] = []
-        self._health_cols: List[str] = []
-        self._all_feature_cols: List[str] = []
+        self._sensor_cols: list[str] = []
+        self._stat_cols: list[str] = []
+        self._health_cols: list[str] = []
+        self._all_feature_cols: list[str] = []
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _select_features(self, X: pd.DataFrame) -> tuple[List[str], List[str], List[str]]:
+    def _select_features(self, X: pd.DataFrame) -> tuple[list[str], list[str], list[str]]:
         """Separate raw sensor, statistical, and health feature columns."""
         exclude = {_UNIT_COL, _CYCLE_COL, "RUL"}
         all_numeric = [
@@ -253,8 +254,8 @@ class HybridModel(BaseModel):
             if c not in exclude and pd.api.types.is_numeric_dtype(X[c])
         ]
 
-        sensor_cols = [c for c in all_numeric if c.startswith("sensor_") or c.startswith("op_setting_")]
-        health_cols = [c for c in all_numeric if "shi" in c.lower() or "health" in c.lower() or "evidence_" in c.lower()]
+        sensor_cols = [c for c in all_numeric if c.startswith("sensor_") or c.startswith("op_setting_")]  # noqa: E501
+        health_cols = [c for c in all_numeric if "shi" in c.lower() or "health" in c.lower() or "evidence_" in c.lower()]  # noqa: E501
         stat_cols = [c for c in all_numeric if c not in sensor_cols and c not in health_cols]
 
         # If no health/stat columns detected, fall back to all numeric
@@ -360,10 +361,9 @@ class HybridModel(BaseModel):
         best_state = None
         patience_counter = 0
 
-        for epoch in range(self.epochs):
+        for _epoch in range(self.epochs):
             net.train()
             total_loss = 0.0
-            n_batches = 0
             for X_b, y_b, r_b in loader:
                 X_b, y_b, r_b = X_b.to(self.device), y_b.to(self.device), r_b.to(self.device)
                 optimizer.zero_grad()
@@ -373,7 +373,6 @@ class HybridModel(BaseModel):
                 torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1.0)
                 optimizer.step()
                 total_loss += loss.item()
-                n_batches += 1
 
             # Evaluate on same data (OOF handled externally)
             net.eval()
@@ -381,10 +380,16 @@ class HybridModel(BaseModel):
             n_val = 0
             with torch.no_grad():
                 for X_b, y_b, r_b in loader:
-                    X_b, y_b, r_b = X_b.to(self.device), y_b.to(self.device), r_b.to(self.device)
+                    X_b, y_b, r_b = (
+                        X_b.to(self.device),
+                        y_b.to(self.device),
+                        r_b.to(self.device),
+                    )
                     h_logits, r_pred = net(X_b)
-                    l = bce_loss(h_logits, y_b).item() + mse_loss(r_pred, r_b).item()
-                    val_loss += l
+                    batch_loss = (
+                        bce_loss(h_logits, y_b).item() + mse_loss(r_pred, r_b).item()
+                    )
+                    val_loss += batch_loss
                     n_val += 1
             val_loss /= max(n_val, 1)
             scheduler.step(val_loss)
@@ -414,7 +419,7 @@ class HybridModel(BaseModel):
         self,
         X_train: pd.DataFrame,
         y_train: pd.DataFrame,
-        groups: Optional[np.ndarray] = None,
+        groups: np.ndarray | None = None,
     ) -> HybridModel:
         """Fit the hybrid model (GRU ensemble + optional tabular fallback).
 

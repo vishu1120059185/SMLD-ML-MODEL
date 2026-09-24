@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
-
 
 # ---------------------------------------------------------------------------
 # Sub-schemas (mirrors configs/base.yaml structure)

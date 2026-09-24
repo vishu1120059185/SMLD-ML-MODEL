@@ -18,7 +18,6 @@ Key quantities
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -63,9 +62,9 @@ class ConformalReport:
     coverage: float
     mean_width: float
     winkler: float
-    coverage_by_rul_bucket: Dict[str, float] = field(default_factory=dict)
-    intervals: Optional[pd.DataFrame] = None
-    scores_cal: Optional[np.ndarray] = None
+    coverage_by_rul_bucket: dict[str, float] = field(default_factory=dict)
+    intervals: pd.DataFrame | None = None
+    scores_cal: np.ndarray | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +88,7 @@ def conformal_intervals(
     sigma_test: np.ndarray,
     alpha: float = 0.10,
     eps: float = 1e-8,
-    rul_test: Optional[np.ndarray] = None,
+    rul_test: np.ndarray | None = None,
 ) -> ConformalReport:
     """Build split-conformal prediction intervals on the test set.
 
@@ -133,7 +132,7 @@ def conformal_intervals(
     # Coverage (PICP) – only computable if true values are available
     coverage = np.nan
     winkler_val = np.nan
-    coverage_by_rul_bucket: Dict[str, float] = {}
+    coverage_by_rul_bucket: dict[str, float] = {}
 
     # For RUL-based metrics we need true y
     # We'll use yhat_test + random residuals as proxy if y_true is missing,
@@ -153,7 +152,7 @@ def conformal_intervals(
         for i, name in enumerate(bucket_names):
             mask = (rul_test >= bucket_edges[i]) & (rul_test < bucket_edges[i + 1])
             if mask.sum() > 0:
-                coverage_by_rul_bucket[name] = float(np.mean(covered_cal[mask] if len(covered_cal) == len(mask) else np.nan))
+                coverage_by_rul_bucket[name] = float(np.mean(covered_cal[mask] if len(covered_cal) == len(mask) else np.nan))  # noqa: E501
 
     intervals_df = pd.DataFrame(
         {"lower": lower, "upper": upper, "width": width},

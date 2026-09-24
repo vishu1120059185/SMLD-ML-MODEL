@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from stattwin.data.synthetic import make_synthetic_dataset, make_synthetic_unit
 from stattwin.health.quality import (
     QualityMetrics,
     compute_quality_metrics,
@@ -24,7 +23,6 @@ from stattwin.health.states import (
     classify_states,
 )
 
-
 # ---------------------------------------------------------------------------
 # SHI bounds
 # ---------------------------------------------------------------------------
@@ -32,7 +30,7 @@ from stattwin.health.states import (
 
 class TestSHIBounds:
     def test_shi_values_in_0_100(self, synthetic_dataset):
-        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]
+        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]  # noqa: E501
         result = compute_shi(
             synthetic_dataset,
             sensor_cols=sensor_cols,
@@ -43,7 +41,7 @@ class TestSHIBounds:
         assert shi_vals.max() <= 100.0
 
     def test_shi_has_required_fields(self, synthetic_dataset):
-        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]
+        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]  # noqa: E501
         result = compute_shi(synthetic_dataset, sensor_cols=sensor_cols, baseline_cycles=20)
         assert isinstance(result, HealthIndex)
         assert "shi" in result.shi_values.columns
@@ -53,7 +51,7 @@ class TestSHIBounds:
         assert len(result.sensor_weights) > 0
 
     def test_shi_simple(self, synthetic_dataset):
-        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]
+        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]  # noqa: E501
         from stattwin.health.shi import compute_shi_simple
         result = compute_shi_simple(synthetic_dataset, sensor_cols=sensor_cols, baseline_cycles=20)
         assert "shi" in result.columns
@@ -140,13 +138,13 @@ class TestQualityMetrics:
         assert np.isnan(monotonicity(s))
 
     def test_prognosability(self, synthetic_dataset):
-        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]
+        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]  # noqa: E501
         result = compute_shi(synthetic_dataset, sensor_cols=sensor_cols, baseline_cycles=20)
         prog = prognosability(result.shi_values)
         assert isinstance(prog, float)
 
     def test_compute_quality_metrics(self, synthetic_dataset):
-        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]
+        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]  # noqa: E501
         shi_result = compute_shi(synthetic_dataset, sensor_cols=sensor_cols, baseline_cycles=20)
         qm = compute_quality_metrics(
             shi_result.shi_values,
@@ -156,7 +154,7 @@ class TestQualityMetrics:
         assert "monotonicity_mean" in qm.summary or len(qm.monotonicity) > 0
 
     def test_spearman_rul_correlation(self, synthetic_dataset):
-        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]
+        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]  # noqa: E501
         shi_result = compute_shi(synthetic_dataset, sensor_cols=sensor_cols, baseline_cycles=20)
         corr = spearman_rul_correlation(
             shi_result.shi_values,

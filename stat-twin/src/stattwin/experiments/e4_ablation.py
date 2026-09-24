@@ -19,11 +19,11 @@ from __future__ import annotations
 
 import argparse
 import copy
-import json
 from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -38,17 +38,15 @@ from stattwin.evaluation.significance import (
     paired_bootstrap_ci,
     paired_wilcoxon,
 )
-from stattwin.models import RandomForestModel, XGBoostModel
+from stattwin.models import XGBoostModel
 
 from ._common import (
-    SENSOR_COLS,
     Timer,
     add_common_args,
     resolve_raw_path,
     save_json,
     setup_output,
 )
-
 
 # ---------------------------------------------------------------------------
 # Ablation feature sets
@@ -77,11 +75,11 @@ def _select_features(
     ]
 
     raw_sensors = [c for c in all_numeric if c.startswith("sensor_") or c.startswith("op_setting_")]
-    health_cols = [c for c in all_numeric if "shi" in c.lower() or "evidence_" in c.lower() or "health" in c.lower()]
+    health_cols = [c for c in all_numeric if "shi" in c.lower() or "evidence_" in c.lower() or "health" in c.lower()]  # noqa: E501
 
     stat_temporal = [c for c in all_numeric if c not in raw_sensors and c not in health_cols]
     stat_only = [c for c in stat_temporal if "rmean_" in c or "rstd_" in c or "zscore" in c]
-    temporal_only = [c for c in stat_temporal if "slope_" in c or "pctchg_" in c or "roc_" in c or "ewma_" in c]
+    temporal_only = [c for c in stat_temporal if "slope_" in c or "pctchg_" in c or "roc_" in c or "ewma_" in c]  # noqa: E501
 
     cols = list(raw_sensors)
     if statistical:
@@ -108,7 +106,7 @@ def _oof_per_unit_mae(
     """Run OOF and return per-unit MAE for RUL."""
     unit_mae: dict[str, list[float]] = {}
 
-    for fold_idx, split in enumerate(splits):
+    for _fold_idx, split in enumerate(splits):
         train_units = split["train_units"]
         val_units = split["val_units"]
 
@@ -161,7 +159,7 @@ def run_e4(cfg, df, out_dir) -> dict[str, Any]:
 
         # Aggregate
         all_maes = []
-        for uid, maes in unit_mae.items():
+        for _uid, maes in unit_mae.items():
             all_maes.extend(maes)
 
         variant_results[variant_name] = {
@@ -245,7 +243,7 @@ def _plot_ablation_comparison(variant_results: dict, out_dir: Path) -> None:
     stds = [variant_results[n]["std_mae"] for n in names]
 
     fig, ax = plt.subplots(figsize=(10, 5))
-    bars = ax.bar(names, maes, yerr=stds, capsize=5, color="steelblue")
+    ax.bar(names, maes, yerr=stds, capsize=5, color="steelblue")
     ax.set_ylabel("Mean MAE")
     ax.set_title("Ablation Study – Mean MAE (lower is better)")
     ax.tick_params(axis="x", rotation=30)
@@ -263,9 +261,16 @@ def _plot_pairwise_effects(pairwise_tests: dict, out_dir: Path) -> None:
 
     fig, ax = plt.subplots(figsize=(10, 5))
     y_pos = range(len(names))
-    ax.errorbar(means, y_pos, xerr=[[m - l for m, l in zip(means, lows)],
-                                     [h - m for h, m in zip(highs, means)]],
-                fmt="o", capsize=5)
+    ax.errorbar(
+        means,
+        y_pos,
+        xerr=[
+            [m - lo for m, lo in zip(means, lows, strict=False)],
+            [hi - m for hi, m in zip(highs, means, strict=False)],
+        ],
+        fmt="o",
+        capsize=5,
+    )
     ax.axvline(0, color="red", linestyle="--", alpha=0.5)
     ax.set_yticks(y_pos)
     ax.set_yticklabels(names)

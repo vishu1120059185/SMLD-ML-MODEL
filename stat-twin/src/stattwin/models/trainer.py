@@ -19,13 +19,19 @@ leakage.
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from scipy import stats as sp_stats
-from sklearn.metrics import average_precision_score, mean_absolute_error, mean_squared_error, roc_auc_score
+from sklearn.metrics import (
+    average_precision_score,
+    mean_absolute_error,
+    mean_squared_error,
+    roc_auc_score,
+)
 
 from stattwin.data.schema import FAILURE_HORIZONS, label_col_for
 from stattwin.data.splitter import make_group_kfold_splits
@@ -66,13 +72,13 @@ class EvalResult:
     """Full evaluation result across all folds."""
 
     model_name: str
-    folds: List[FoldResult] = field(default_factory=list)
-    metrics: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    folds: list[FoldResult] = field(default_factory=list)
+    metrics: dict[str, dict[str, float]] = field(default_factory=dict)
     oof_proba: pd.DataFrame = field(default_factory=pd.DataFrame)
     oof_rul: pd.Series = field(default_factory=pd.Series)
     oof_raw_score: pd.Series = field(default_factory=pd.Series)
-    feature_cols: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    feature_cols: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # -----------------------------------------------------------------------
@@ -86,7 +92,7 @@ def compute_metrics(
     y_true_rul: pd.Series | np.ndarray | None = None,
     y_pred_rul: pd.Series | None = None,
     horizons: Sequence[int] | None = None,
-) -> Dict[str, Dict[str, float]]:
+) -> dict[str, dict[str, float]]:
     """Compute per-horizon classification and RUL regression metrics.
 
     Parameters
@@ -110,7 +116,7 @@ def compute_metrics(
     if horizons is None:
         horizons = FAILURE_HORIZONS
 
-    result: Dict[str, Dict[str, float]] = {}
+    result: dict[str, dict[str, float]] = {}
 
     for h in horizons:
         col = label_col_for(h)
@@ -166,12 +172,14 @@ def compute_metrics(
     return result
 
 
-def _merge_metrics(all_fold_metrics: List[Dict[str, Dict[str, float]]]) -> Dict[str, Dict[str, float]]:
+def _merge_metrics(
+    all_fold_metrics: list[dict[str, dict[str, float]]],
+) -> dict[str, dict[str, float]]:
     """Average metrics across folds."""
     if not all_fold_metrics:
         return {}
 
-    merged: Dict[str, Dict[str, List[float]]] = {}
+    merged: dict[str, dict[str, list[float]]] = {}
     for fm in all_fold_metrics:
         for metric, hv in fm.items():
             merged.setdefault(metric, {})
@@ -193,7 +201,7 @@ def _detect_feature_cols(
     X: pd.DataFrame,
     include_statistical: bool = True,
     include_health: bool = True,
-) -> List[str]:
+) -> list[str]:
     """Detect feature columns based on ablation variant.
 
     Parameters
@@ -217,7 +225,7 @@ def _detect_feature_cols(
         # Ablation variant A: raw sensor features only
         return raw_sensor if raw_sensor else all_numeric
 
-    health_cols = [c for c in all_numeric if "shi" in c.lower() or "health" in c.lower() or "evidence_" in c.lower()]
+    health_cols = [c for c in all_numeric if "shi" in c.lower() or "health" in c.lower() or "evidence_" in c.lower()]  # noqa: E501
     stat_cols = [c for c in all_numeric if c not in raw_sensor and c not in health_cols]
 
     cols = list(raw_sensor)
@@ -273,8 +281,8 @@ def run_oof(
     splits = make_group_kfold_splits(X, n_splits=n_splits, seed=seed)
     feature_cols = _detect_feature_cols(X, include_statistical, include_health)
 
-    fold_results: List[FoldResult] = []
-    all_fold_metrics: List[Dict[str, Dict[str, float]]] = []
+    fold_results: list[FoldResult] = []
+    all_fold_metrics: list[dict[str, dict[str, float]]] = []
 
     # Collect OOF predictions
     oof_proba_parts: list[pd.DataFrame] = []

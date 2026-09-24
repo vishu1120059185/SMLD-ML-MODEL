@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import argparse
 import copy
-import json
 from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -26,12 +26,10 @@ import pandas as pd
 from stattwin.config import load_config
 from stattwin.data.loader import load_cmapss
 from stattwin.data.schema import FAILURE_HORIZONS, label_col_for
-from stattwin.data.splitter import make_group_kfold_splits, inner_unit_split
-from stattwin.evaluation.metrics import probabilistic_metrics, interval_metrics
-from stattwin.models import RandomForestModel, XGBoostModel
+from stattwin.data.splitter import make_group_kfold_splits
+from stattwin.models import XGBoostModel
 from stattwin.uncertainty.calibration import (
     brier_score,
-    calibrate_isotonic,
     ece_equal_mass,
     ece_equal_width,
     reliability_diagram_data,
@@ -39,7 +37,6 @@ from stattwin.uncertainty.calibration import (
 from stattwin.uncertainty.conformal import conformal_intervals
 
 from ._common import (
-    SENSOR_COLS,
     Timer,
     add_common_args,
     feature_columns,
@@ -47,7 +44,6 @@ from ._common import (
     save_json,
     setup_output,
 )
-
 
 # ---------------------------------------------------------------------------
 # OOF evaluation for uncertainty
@@ -152,7 +148,7 @@ def _conformal_analysis(
     X_test = X[X["unit_id"].isin(test_units)].copy()
 
     m_cal = copy.deepcopy(model)
-    m_test = copy.deepcopy(model)
+    copy.deepcopy(model)
 
     try:
         # Fit on training portion of first split

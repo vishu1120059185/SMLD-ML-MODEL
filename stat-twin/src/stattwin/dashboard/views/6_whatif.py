@@ -1,12 +1,10 @@
 """Page 6 — WHAT-IF SIMULATOR: sliders outside, live comparison inside."""
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import numpy as np
 import streamlit as st
 
+from stattwin.dashboard.components.artifacts import load_artifact as _load
 from stattwin.dashboard.components.cards import (
     delta_card,
     disclaimer_banner,
@@ -26,23 +24,6 @@ from stattwin.dashboard.components.live import (
     rul_countdown,
     state_from_shi,
 )
-
-RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
-
-
-def _load(name: str, machine: str | None = None):
-    candidates = []
-    if machine:
-        candidates.append(RESULTS_DIR / machine / name)
-    candidates.append(RESULTS_DIR / "global" / name)
-    candidates.append(RESULTS_DIR / name)
-    for p in candidates:
-        if p.exists():
-            try:
-                return json.loads(p.read_text())
-            except Exception:
-                continue
-    return None
 
 
 def _simulate(sensors: dict, adjustments: dict) -> dict:
@@ -131,9 +112,9 @@ def render() -> None:
         with c3:
             kpi_card(
                 "RUL",
-                f"{rul_live:.1f} days",
+                f"{rul_live:.1f} cycles",
                 delta="counting down · live",
-                provenance="PREDICTED",
+                provenance="SIMULATED" if not forecast else "PREDICTED",
             )
 
     live_baseline()
@@ -211,23 +192,32 @@ def render() -> None:
         section_header("Simulated Outcome")
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            delta_card("SHI", baseline_shi, float(result["shi"]))
+            delta_card(
+                "SHI",
+                baseline_shi,
+                float(result["shi"]),
+                higher_is_better=True,
+                provenance="SIMULATED",
+            )
         with c2:
             st.markdown(
                 f"<div class='st-kpi' style='text-align:center;'>"
-                f"<div class='st-kpi-label' style='justify-content:center;'>State</div>"
+                f"<div class='st-kpi-label' style='justify-content:center;'>"
+                f"State {provenance_badge('SIMULATED')}</div>"
                 f"<div style='font-size:0.95rem;color:#F9FAFB;"
                 f"font-family:\"JetBrains Mono\",monospace;'>"
                 f"{baseline_state} → <b>{result['state']}</b></div>"
-                f"<div class='st-kpi-delta'>SIMULATED</div></div>",
+                f"<div class='st-kpi-delta'>SIMULATION</div></div>",
                 unsafe_allow_html=True,
             )
         with c3:
             delta_card(
-                "RUL (days)",
+                "RUL (cycles)",
                 baseline_rul,
                 float(result["rul"]),
                 fmt=".1f",
+                higher_is_better=True,
+                provenance="SIMULATED",
             )
         with c4:
             st.plotly_chart(

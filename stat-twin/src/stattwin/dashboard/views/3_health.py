@@ -1,13 +1,11 @@
 """Page 3 — STATISTICAL HEALTH: live SHI, state bands, heatmap, variance."""
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import streamlit as st
 
+from stattwin.dashboard.components.artifacts import load_artifact as _load
 from stattwin.dashboard.components.cards import (
     kpi_card,
     page_header,
@@ -24,23 +22,6 @@ from stattwin.dashboard.components.live import (
     slide_window,
     state_from_shi,
 )
-
-RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
-
-
-def _load(name: str, machine: str | None = None):
-    candidates = []
-    if machine:
-        candidates.append(RESULTS_DIR / machine / name)
-    candidates.append(RESULTS_DIR / "global" / name)
-    candidates.append(RESULTS_DIR / name)
-    for p in candidates:
-        if p.exists():
-            try:
-                return json.loads(p.read_text())
-            except Exception:
-                continue
-    return None
 
 
 def _state_changes(timestamps: list, states: list) -> list[dict]:
@@ -183,7 +164,12 @@ def render() -> None:
                 provenance="OBSERVED" if health else "SIMULATED",
             )
         with c3:
-            kpi_card("State", state, delta="re-derived from live SHI", provenance="OBSERVED")
+            kpi_card(
+                "State",
+                state,
+                delta="re-derived from live SHI",
+                provenance="OBSERVED" if health else "SIMULATED",
+            )
 
         section_header("Z-Score Heatmap", "sensor × time · cells shift every 2s")
         z = np.asarray(z_heatmap.get("z", [[]]), dtype=float)

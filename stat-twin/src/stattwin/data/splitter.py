@@ -17,7 +17,6 @@ Design rules (from the masterplan):
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -46,7 +45,7 @@ def make_group_kfold_splits(
     *,
     n_splits: int = N_SPLITS,
     seed: int = 42,
-) -> List[Dict[str, np.ndarray]]:
+) -> list[dict[str, np.ndarray]]:
     """Yield outer ``GroupKFold`` splits at the **unit** level.
 
     Parameters
@@ -73,7 +72,7 @@ def make_group_kfold_splits(
 
     # ``split`` iterates over (train_idx, val_idx) where idx refer to the
     # *rows of ``units``* (because we pass ``units`` as both X and group).
-    splits: List[Dict[str, np.ndarray]] = []
+    splits: list[dict[str, np.ndarray]] = []
     for train_idx, val_idx in gkf.split(X=units, groups=groups):
         splits.append(
             {
@@ -87,7 +86,7 @@ def make_group_kfold_splits(
 
 
 def _assert_disjoint_outer_folds(
-    splits: List[Dict[str, np.ndarray]],
+    splits: list[dict[str, np.ndarray]],
 ) -> None:
     """Ensure no unit appears in more than one outer-validation fold."""
     seen_val: set = set()
@@ -110,7 +109,7 @@ def inner_unit_split(
     *,
     val_frac: float = INNER_VAL_FRAC,
     seed: int = 42,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Split outer-training units into inner-train and inner-validation sets.
 
     The inner-validation set contains ~``val_frac`` of the units and is
@@ -164,7 +163,7 @@ def validate_dataset(
     *,
     require_rul: bool = False,
     require_labels: bool = False,
-    expected_columns: Optional[List[str]] = None,
+    expected_columns: list[str] | None = None,
 ) -> None:
     """Validate structural invariants of a telemetry ``DataFrame``.
 

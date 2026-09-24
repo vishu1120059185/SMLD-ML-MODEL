@@ -12,12 +12,11 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import copy
-import json
 from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,20 +24,16 @@ import pandas as pd
 
 from stattwin.config import load_config
 from stattwin.data.loader import load_cmapss
-from stattwin.data.schema import FAILURE_HORIZONS, label_col_for
-from stattwin.data.splitter import make_group_kfold_splits
 from stattwin.preprocessing.dq import DQConfig, DQEngine
 
 from ._common import (
     SENSOR_COLS,
     Timer,
     add_common_args,
-    feature_columns,
     resolve_raw_path,
     save_json,
     setup_output,
 )
-
 
 # ---------------------------------------------------------------------------
 # Synthetic fault injection
@@ -75,7 +70,7 @@ def _inject_spikes(
         fault_cycles = rng.choice(healthy_cycles, size=n_faults_per_unit, replace=False)
         fault_sensors = rng.choice(sensor_cols, size=n_faults_per_unit, replace=True)
 
-        for cycle, sensor in zip(fault_cycles, fault_sensors):
+        for cycle, sensor in zip(fault_cycles, fault_sensors, strict=False):
             mask = (faulty["unit_id"] == uid) & (faulty["cycle"] == cycle)
             if mask.any():
                 idx = faulty.index[mask][0]
@@ -129,7 +124,7 @@ def _inject_stuck(
         )
         fault_sensors = rng.choice(sensor_cols, size=n_faults_per_unit, replace=True)
 
-        for start, sensor in zip(fault_starts, fault_sensors):
+        for start, sensor in zip(fault_starts, fault_sensors, strict=False):
             stuck_value = float(faulty.loc[
                 (faulty["unit_id"] == uid) & (faulty["cycle"] == start), sensor
             ].values[0])
@@ -191,7 +186,7 @@ def _evaluate_dq_detection(
     flagged = dq_engine.transform(faulty_df)
 
     # Check if DQ flags were added
-    dq_flag_cols = [c for c in flagged.columns if "dq_" in c.lower() or "flag" in c.lower() or "outlier" in c.lower()]
+    dq_flag_cols = [c for c in flagged.columns if "dq_" in c.lower() or "flag" in c.lower() or "outlier" in c.lower()]  # noqa: E501
 
     if not dq_flag_cols:
         # If no DQ flags, use robust_z on sensor deviations as proxy
@@ -207,7 +202,7 @@ def _evaluate_dq_detection(
     for _, fault_row in faults.iterrows():
         uid = fault_row["unit_id"]
         cycle = fault_row["cycle"]
-        sensor = fault_row["sensor"]
+        fault_row["sensor"]
 
         row_mask = (flagged["unit_id"] == uid) & (flagged["cycle"] == cycle)
         if row_mask.any():
@@ -372,14 +367,14 @@ def run_e8(cfg, df, out_dir) -> dict[str, Any]:
     faulty_spikes, gt_spikes = _inject_spikes(df, sensor_cols, seed=cfg.seed)
     spike_results = _evaluate_dq_detection(faulty_spikes, gt_spikes, sensor_cols)
     all_results["spike"] = spike_results
-    print(f"    Spike: P={spike_results['precision']:.3f} R={spike_results['recall']:.3f} F1={spike_results['f1']:.3f}")
+    print(f"    Spike: P={spike_results['precision']:.3f} R={spike_results['recall']:.3f} F1={spike_results['f1']:.3f}")  # noqa: E501
 
     # Stuck injection
     print("  Injecting stuck-sensor faults...")
     faulty_stuck, gt_stuck = _inject_stuck(df, sensor_cols, seed=cfg.seed)
     stuck_results = _evaluate_dq_detection(faulty_stuck, gt_stuck, sensor_cols)
     all_results["stuck"] = stuck_results
-    print(f"    Stuck: P={stuck_results['precision']:.3f} R={stuck_results['recall']:.3f} F1={stuck_results['f1']:.3f}")
+    print(f"    Stuck: P={stuck_results['precision']:.3f} R={stuck_results['recall']:.3f} F1={stuck_results['f1']:.3f}")  # noqa: E501
 
     # Combined
     all_results["summary"] = {
@@ -415,7 +410,7 @@ def main() -> None:
     out_dir = setup_output("e8_fault_injection")
 
     with Timer() as t:
-        results = run_e8(cfg, df, out_dir)
+        run_e8(cfg, df, out_dir)
 
     print(f"\n[e8] Completed in {t.elapsed:.1f}s")
     print(f"     Output: {out_dir}")

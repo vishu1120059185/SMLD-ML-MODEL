@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import numpy as np
-import pandas as pd
-import pytest
-
-from stattwin.data.synthetic import make_synthetic_dataset
 from stattwin.data.splitter import make_group_kfold_splits
+from stattwin.data.synthetic import make_synthetic_dataset
 from stattwin.health.shi import compute_shi
 from stattwin.health.states import StateClassifier
 
@@ -16,7 +12,7 @@ class TestThresholdSelectedOnVal:
     def test_state_thresholds_from_train_only(self, synthetic_dataset):
         """StateClassifier thresholds should be calibrated on training data, not test data."""
         splits = make_group_kfold_splits(synthetic_dataset, n_splits=3)
-        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]
+        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]  # noqa: E501
 
         for s in splits:
             train_units = s["train_units"]

@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import argparse
 import copy
-import json
 from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,9 +27,7 @@ from stattwin.config import load_config
 from stattwin.data.loader import load_cmapss
 from stattwin.data.schema import FAILURE_HORIZONS, OP_SETTINGS, label_col_for
 from stattwin.data.splitter import make_group_kfold_splits
-from stattwin.evaluation.metrics import evaluate_classification, evaluate_rul
-from stattwin.models import RandomForestModel, XGBoostModel
-from stattwin.preprocessing.scaler import TrainFittedScaler
+from stattwin.models import XGBoostModel
 
 from ._common import (
     SENSOR_COLS,
@@ -40,7 +38,6 @@ from ._common import (
     save_json,
     setup_output,
 )
-
 
 # ---------------------------------------------------------------------------
 # Regime normalization
@@ -72,10 +69,7 @@ def _per_condition_normalize(
         out = _assign_regimes(out)
 
     # Fit on training units only
-    if fit_units is not None:
-        fit_df = out[out["unit_id"].isin(fit_units)]
-    else:
-        fit_df = out
+    fit_df = out[out["unit_id"].isin(fit_units)] if fit_units is not None else out
 
     # Compute per-regime statistics
     regime_stats: dict[int, dict[str, tuple[float, float]]] = {}
@@ -260,7 +254,7 @@ def main() -> None:
     out_dir = setup_output("e7_operating_conditions")
 
     with Timer() as t:
-        results = run_e7(cfg, df, out_dir)
+        run_e7(cfg, df, out_dir)
 
     print(f"\n[e7] Completed in {t.elapsed:.1f}s")
     print(f"     Output: {out_dir}")

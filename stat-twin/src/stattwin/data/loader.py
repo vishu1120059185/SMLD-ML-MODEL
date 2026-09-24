@@ -16,14 +16,12 @@ ValueError
 from __future__ import annotations
 
 import pathlib
-from typing import List, Optional, Union
 
 import pandas as pd
 
 from stattwin.data.schema import (
     COLUMN_NAMES,
     FAILURE_HORIZONS,
-    LABEL_COL_TEMPLATE,
     label_col_for,
 )
 
@@ -31,9 +29,9 @@ __all__ = ["load_cmapss"]
 
 
 def load_cmapss(
-    path: Union[str, pathlib.Path],
+    path: str | pathlib.Path,
     *,
-    horizons: Optional[List[int]] = None,
+    horizons: list[int] | None = None,
     add_labels: bool = True,
 ) -> pd.DataFrame:
     """Load a single C-MAPSS text file and return a validated ``DataFrame``.
@@ -139,7 +137,7 @@ def _compute_rul(df: pd.DataFrame) -> pd.DataFrame:
 
 def _add_failure_labels(
     df: pd.DataFrame,
-    horizons: List[int],
+    horizons: list[int],
 ) -> pd.DataFrame:
     """Add binary ``fail_h{h}`` columns for each horizon *h*.
 

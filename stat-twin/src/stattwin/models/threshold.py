@@ -18,7 +18,7 @@ References
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -69,10 +69,10 @@ class ThresholdModel(BaseModel):
         self.baseline_cycles = baseline_cycles
 
         # Fitted parameters (set during ``fit``)
-        self._baseline_means: Dict[str, float] = {}
-        self._baseline_stds: Dict[str, float] = {}
-        self._sensor_cols: List[str] = []
-        self._isotonic_probas: Dict[int, IsotonicRegression] = {}
+        self._baseline_means: dict[str, float] = {}
+        self._baseline_stds: dict[str, float] = {}
+        self._sensor_cols: list[str] = []
+        self._isotonic_probas: dict[int, IsotonicRegression] = {}
         self._isotonic_rul: IsotonicRegression | None = None
 
     # ------------------------------------------------------------------
@@ -101,7 +101,7 @@ class ThresholdModel(BaseModel):
 
     def _raw_to_probas(self, raw: pd.Series) -> pd.DataFrame:
         """Map raw score to per-horizon probabilities using fitted isotonic models."""
-        proba_dict: Dict[str, np.ndarray] = {}
+        proba_dict: dict[str, np.ndarray] = {}
         raw_vals = raw.to_numpy().reshape(-1, 1)
         for h in self.horizons:
             iso = self._isotonic_probas.get(h)
@@ -156,7 +156,7 @@ class ThresholdModel(BaseModel):
         self,
         X_train: pd.DataFrame,
         y_train: pd.DataFrame,
-        groups: Optional[np.ndarray] = None,
+        groups: np.ndarray | None = None,
     ) -> ThresholdModel:
         """Fit baseline statistics and isotonic calibrators.
 

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 import pytest
 
-from stattwin.data.synthetic import make_synthetic_dataset
 from stattwin.data.splitter import inner_unit_split, make_group_kfold_splits
+from stattwin.data.synthetic import make_synthetic_dataset
 from stattwin.preprocessing.missing import TrainMedianFill
 from stattwin.preprocessing.outliers import RobustZDetector
 from stattwin.preprocessing.scaler import TrainFittedScaler
@@ -25,7 +24,7 @@ class TestFitOnlyOnTrain:
         df, splits = split_data
         s = splits[0]
         train_df = df[df["unit_id"].isin(s["train_units"])]
-        test_df = df[df["unit_id"].isin(s["val_units"])]
+        df[df["unit_id"].isin(s["val_units"])]
 
         sensor_cols = [c for c in df.columns if c.startswith("sensor_") and df[c].sum() != 0][:3]
         imputer = TrainMedianFill(columns=sensor_cols)

@@ -7,9 +7,7 @@ hash, seeds, package versions, and timestamp.
 from __future__ import annotations
 
 import datetime as _dt
-import hashlib
 import json
-import os
 import platform
 import subprocess
 from pathlib import Path
@@ -123,7 +121,7 @@ def write_manifest(
     out.mkdir(parents=True, exist_ok=True)
     manifest_path = out / "manifest.json"
 
-    now = _dt.datetime.now(_dt.timezone.utc).isoformat()
+    now = _dt.datetime.now(_dt.UTC).isoformat()
 
     manifest: dict[str, Any] = {
         "timestamp": now,

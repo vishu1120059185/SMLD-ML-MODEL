@@ -16,7 +16,7 @@ predictions to avoid leakage.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -78,8 +78,8 @@ class CalibrationReport:
     ece_after_ew: float = np.nan
     ece_before_em: float = np.nan
     ece_after_em: float = np.nan
-    reliability_before: Optional[pd.DataFrame] = None
-    reliability_after: Optional[pd.DataFrame] = None
+    reliability_before: pd.DataFrame | None = None
+    reliability_after: pd.DataFrame | None = None
     calibrator: Any = None
 
 
@@ -267,7 +267,7 @@ def reliability_diagram_data(
 def calibrate_isotonic(
     y_true: np.ndarray,
     y_raw: np.ndarray,
-    y_test_raw: Optional[np.ndarray] = None,
+    y_test_raw: np.ndarray | None = None,
     horizon: int = 0,
 ) -> CalibrationReport:
     """Fit an isotonic-regression calibrator and evaluate on OOF / test data.
@@ -317,7 +317,7 @@ def calibrate_isotonic(
 def calibrate_platt(
     y_true: np.ndarray,
     y_raw: np.ndarray,
-    y_test_raw: Optional[np.ndarray] = None,
+    y_test_raw: np.ndarray | None = None,
     horizon: int = 0,
 ) -> CalibrationReport:
     """Fit a Platt-scaling calibrator and evaluate on OOF / test data.

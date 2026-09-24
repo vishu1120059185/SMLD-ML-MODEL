@@ -14,11 +14,11 @@ from __future__ import annotations
 
 import argparse
 import copy
-import json
 from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,8 +29,6 @@ from stattwin.data.loader import load_cmapss
 from stattwin.data.schema import FAILURE_HORIZONS, label_col_for
 from stattwin.data.splitter import make_group_kfold_splits
 from stattwin.evaluation.metrics import (
-    ClassificationReport,
-    RULReport,
     evaluate_classification,
     evaluate_rul,
 )
@@ -50,7 +48,6 @@ from ._common import (
     save_json,
     setup_output,
 )
-
 
 # ---------------------------------------------------------------------------
 # Model registry
@@ -109,7 +106,7 @@ def _evaluate_single_model(
 
         all_proba.append(proba)
         all_rul_pred.append(rul_pred)
-        all_rul_true.append(rul_series.loc[X_val.index] if "RUL" in X_val.columns else pd.Series(dtype=float))
+        all_rul_true.append(rul_series.loc[X_val.index] if "RUL" in X_val.columns else pd.Series(dtype=float))  # noqa: E501
         all_y_true.append(y_val)
         all_raw_score.append(raw)
 
@@ -222,7 +219,7 @@ def _plot_rul_comparison(all_results: list[dict], out_dir: Path) -> None:
 
 def run_e2(cfg, df, out_dir) -> dict[str, Any]:
     """Run model comparison experiment."""
-    sensor_cols = [c for c in SENSOR_COLS if c in df.columns]
+    [c for c in SENSOR_COLS if c in df.columns]
     feature_cols = feature_columns(df, include_health=True)
 
     # Prepare labels

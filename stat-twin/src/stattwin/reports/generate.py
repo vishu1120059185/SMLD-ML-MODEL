@@ -67,7 +67,11 @@ def _table_e0(data: dict) -> str:
         "|--------|-------|",
         f"| Cycles/unit (mean ± std) | {cld.get('mean', 0):.1f} ± {cld.get('std', 0):.1f} |",
         f"| Cycles/unit (min–max) | {cld.get('min', 0)}–{cld.get('max', 0)} |",
-        f"| RUL range | {data.get('unit_summary', {}).get('rul_range', {}).get('overall_min', '?')}–{data.get('unit_summary', {}).get('rul_range', {}).get('overall_max', '?')} |",
+        (
+            "| RUL range | "
+            f"{data.get('unit_summary', {}).get('rul_range', {}).get('overall_min', '?')}–"
+            f"{data.get('unit_summary', {}).get('rul_range', {}).get('overall_max', '?')} |"
+        ),
     ]
 
     const = data.get("constant_sensors", {})
@@ -125,7 +129,7 @@ def _table_e2(data: dict) -> str:
             val = entry["roc_auc"] if entry else None
             row += f" {_fmt(val)} |"
         rul = m.get("rul", {})
-        row += f" {_fmt(rul.get('rmse'))} | {_fmt(rul.get('mae'))} | {_fmt(rul.get('nasa_score'))} |"
+        row += f" {_fmt(rul.get('rmse'))} | {_fmt(rul.get('mae'))} | {_fmt(rul.get('nasa_score'))} |"  # noqa: E501
         lines.append(row)
     lines.append("")
     return "\n".join(lines)
@@ -272,8 +276,14 @@ def _table_e7(data: dict) -> str:
         "",
         "| Setting | ROC-AUC (h30) | RUL RMSE |",
         "|----------|---------------|----------|",
-        f"| Without normalization | {_fmt(no_norm.get('mean_roc_auc_h30'))} | {_fmt(no_norm.get('mean_rul_rmse'))} |",
-        f"| With normalization | {_fmt(with_norm.get('mean_roc_auc_h30'))} | {_fmt(with_norm.get('mean_rul_rmse'))} |",
+        (
+            f"| Without normalization | {_fmt(no_norm.get('mean_roc_auc_h30'))} "
+            f"| {_fmt(no_norm.get('mean_rul_rmse'))} |"
+        ),
+        (
+            f"| With normalization | {_fmt(with_norm.get('mean_roc_auc_h30'))} "
+            f"| {_fmt(with_norm.get('mean_rul_rmse'))} |"
+        ),
         "",
     ]
     return "\n".join(lines)
@@ -291,7 +301,7 @@ def _table_e8(data: dict) -> str:
     for ft in ["spike", "stuck"]:
         if ft in fi and "precision" in fi[ft]:
             r = fi[ft]
-            lines.append(f"| {ft} | {_fmt(r.get('precision'))} | {_fmt(r.get('recall'))} | {_fmt(r.get('f1'))} |")
+            lines.append(f"| {ft} | {_fmt(r.get('precision'))} | {_fmt(r.get('recall'))} | {_fmt(r.get('f1'))} |")  # noqa: E501
     lines.append("")
     return "\n".join(lines)
 

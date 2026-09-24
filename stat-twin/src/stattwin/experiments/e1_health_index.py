@@ -12,11 +12,11 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -26,10 +26,6 @@ from stattwin.config import load_config
 from stattwin.data.loader import load_cmapss
 from stattwin.health.quality import (
     compute_quality_metrics,
-    monotonicity,
-    prognosability,
-    spearman_rul_correlation,
-    trendability,
 )
 from stattwin.health.shi import EvidenceComponent, compute_shi
 from stattwin.health.states import classify_states
@@ -42,7 +38,6 @@ from ._common import (
     save_json,
     setup_output,
 )
-
 
 # ---------------------------------------------------------------------------
 # Weight sensitivity sweep
@@ -155,7 +150,7 @@ def _plot_shi_examples(
     fig, axes = plt.subplots(1, n_units, figsize=(4 * n_units, 4), sharey=True)
     if n_units == 1:
         axes = [axes]
-    for ax, uid in zip(axes, units):
+    for ax, uid in zip(axes, units, strict=False):
         u_shi = shi_df[shi_df["unit_id"] == uid]
         u_rul = df[df["unit_id"] == uid]
         ax.plot(u_shi["cycle"], u_shi["shi"], label="SHI", linewidth=1.5)

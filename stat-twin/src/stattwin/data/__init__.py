@@ -6,7 +6,7 @@ synthetic fixtures, and the dataset abstraction used throughout the pipeline.
 
 from stattwin.data.datasets import TelemetryDataset
 from stattwin.data.loader import load_cmapss
-from stattwin.data.schema import FAILURE_HORIZONS, SENSOR_NAMES, COLUMN_NAMES
+from stattwin.data.schema import COLUMN_NAMES, FAILURE_HORIZONS, SENSOR_NAMES
 from stattwin.data.splitter import (
     inner_unit_split,
     make_group_kfold_splits,

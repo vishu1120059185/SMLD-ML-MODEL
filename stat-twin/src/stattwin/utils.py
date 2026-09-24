@@ -136,7 +136,6 @@ def chunk_dataframe(df: Any, column: str, n_chunks: int) -> list[Any]:
     -------
     list[pandas.DataFrame]
     """
-    import pandas as pd
 
     uniques = df[column].unique()
     splits = np.array_split(uniques, min(n_chunks, len(uniques)))

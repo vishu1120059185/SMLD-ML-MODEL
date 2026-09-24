@@ -9,7 +9,6 @@ import pytest
 from stattwin.data.schema import FAILURE_HORIZONS, label_col_for
 from stattwin.forecasting.forecast import (
     ConsistencyReport,
-    ForecastProfile,
     build_probability_curve,
     build_rul_profile,
     check_consistency,
@@ -20,7 +19,7 @@ from stattwin.forecasting.forecast import (
 class TestProbabilityCurve:
     def test_build_probability_curve(self):
         proba_row = pd.Series(
-            {label_col_for(h): p for h, p in zip(FAILURE_HORIZONS, [0.1, 0.2, 0.4, 0.6, 0.9])}
+            {label_col_for(h): p for h, p in zip(FAILURE_HORIZONS, [0.1, 0.2, 0.4, 0.6, 0.9], strict=False)}  # noqa: E501
         )
         horizons_arr, proba_arr, interp_x, interp_y = build_probability_curve(proba_row)
 
@@ -35,7 +34,7 @@ class TestProbabilityCurve:
     def test_probability_curve_monotone_input(self):
         """Monotonically increasing input should produce approximately monotone output."""
         proba_row = pd.Series(
-            {label_col_for(h): p for h, p in zip(FAILURE_HORIZONS, [0.1, 0.3, 0.5, 0.7, 0.9])}
+            {label_col_for(h): p for h, p in zip(FAILURE_HORIZONS, [0.1, 0.3, 0.5, 0.7, 0.9], strict=False)}  # noqa: E501
         )
         _, _, _, interp_y = build_probability_curve(proba_row)
         diffs = np.diff(interp_y)
@@ -84,7 +83,7 @@ class TestRULProfile:
 class TestConsistencyCheck:
     def test_consistent_probas(self):
         proba_row = pd.Series(
-            {label_col_for(h): p for h, p in zip(FAILURE_HORIZONS, [0.1, 0.3, 0.5, 0.7, 0.9])}
+            {label_col_for(h): p for h, p in zip(FAILURE_HORIZONS, [0.1, 0.3, 0.5, 0.7, 0.9], strict=False)}  # noqa: E501
         )
         report = check_consistency(proba_row, rul_point=40.0, t_now=0.0)
         assert isinstance(report, ConsistencyReport)
@@ -94,7 +93,7 @@ class TestConsistencyCheck:
 
     def test_inconsistent_probas(self):
         proba_row = pd.Series(
-            {label_col_for(h): p for h, p in zip(FAILURE_HORIZONS, [0.9, 0.3, 0.1, 0.7, 0.5])}
+            {label_col_for(h): p for h, p in zip(FAILURE_HORIZONS, [0.9, 0.3, 0.1, 0.7, 0.5], strict=False)}  # noqa: E501
         )
         report = check_consistency(proba_row, rul_point=40.0, t_now=0.0)
         assert report.spearman_rho < 0.8 or report.monotonicity_violations > 0

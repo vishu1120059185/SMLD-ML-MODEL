@@ -15,12 +15,12 @@ References
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
 from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
 from stattwin.data.schema import label_col_for
@@ -60,17 +60,17 @@ class LogisticModel(BaseModel):
         self.max_iter = max_iter
         self.class_weight = class_weight
 
-        self._classifiers: Dict[int, LogisticRegression] = {}
+        self._classifiers: dict[int, LogisticRegression] = {}
         self._scaler: StandardScaler = StandardScaler()
-        self._sensor_cols: List[str] = []
+        self._sensor_cols: list[str] = []
         self._isotonic_rul: IsotonicRegression | None = None
-        self._iso_probas: Dict[int, IsotonicRegression] = {}
+        self._iso_probas: dict[int, IsotonicRegression] = {}
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _select_features(self, X: pd.DataFrame) -> List[str]:
+    def _select_features(self, X: pd.DataFrame) -> list[str]:
         """Return raw sensor columns only (no derived features)."""
         return [
             c for c in X.columns
@@ -106,7 +106,7 @@ class LogisticModel(BaseModel):
         self,
         X_train: pd.DataFrame,
         y_train: pd.DataFrame,
-        groups: Optional[np.ndarray] = None,
+        groups: np.ndarray | None = None,
     ) -> LogisticModel:
         """Fit per-horizon logistic classifiers and RUL isotonic mapper.
 
@@ -166,7 +166,7 @@ class LogisticModel(BaseModel):
     def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
         """Predict per-horizon failure probabilities."""
         X_scaled = self._get_scaled(X, fit=False)
-        proba_dict: Dict[str, np.ndarray] = {}
+        proba_dict: dict[str, np.ndarray] = {}
         for h in self.horizons:
             clf = self._classifiers.get(h)
             if clf is None:

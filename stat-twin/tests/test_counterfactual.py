@@ -12,7 +12,6 @@ from stattwin.counterfactual.simulator import (
     WhatIfSimulator,
 )
 
-
 # ---------------------------------------------------------------------------
 # Simple model for counterfactual tests
 # ---------------------------------------------------------------------------
@@ -127,7 +126,12 @@ class TestWhatIfSimulatorRun:
         result = sim.run(
             df, unit_id=1, cycle=50,
             sensor_perturbations={
-                "sensor_1": {"type": "multiplicative", "factor": 0.5, "start_cycle": 50, "end_cycle": 60},
+                "sensor_1": {
+                    "type": "multiplicative",
+                    "factor": 0.5,
+                    "start_cycle": 50,
+                    "end_cycle": 60,
+                },
             },
         )
         assert isinstance(result, SimulationResult)

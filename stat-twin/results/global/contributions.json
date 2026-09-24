@@ -1,0 +1,50 @@
+{
+  "sensors": [
+    {
+      "name": "SENSOR_11",
+      "importance": 0.08329282929819522
+    },
+    {
+      "name": "SENSOR_4",
+      "importance": 0.08224273285507719
+    },
+    {
+      "name": "SENSOR_13",
+      "importance": 0.08204597478266523
+    },
+    {
+      "name": "SENSOR_12",
+      "importance": 0.0819377575887174
+    },
+    {
+      "name": "SENSOR_8",
+      "importance": 0.07842343108039222
+    },
+    {
+      "name": "SENSOR_7",
+      "importance": 0.0772956653656327
+    },
+    {
+      "name": "SENSOR_21",
+      "importance": 0.0757000611881538
+    },
+    {
+      "name": "SENSOR_20",
+      "importance": 0.070543560131146
+    }
+  ],
+  "types": [
+    {
+      "name": "trend (Spearman)",
+      "importance": 0.55
+    },
+    {
+      "name": "level shift",
+      "importance": 0.25
+    },
+    {
+      "name": "variance drift",
+      "importance": 0.2
+    }
+  ]
+}

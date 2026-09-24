@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import tempfile
 from pathlib import Path
 
@@ -11,8 +10,8 @@ import pandas as pd
 import pytest
 
 from stattwin.config import STATTWINConfig
-from stattwin.data.synthetic import make_synthetic_dataset, make_synthetic_unit
 from stattwin.data.schema import FAILURE_HORIZONS, label_col_for
+from stattwin.data.synthetic import make_synthetic_dataset, make_synthetic_unit
 
 
 @pytest.fixture()

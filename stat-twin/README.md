@@ -3,7 +3,7 @@
 **Statistical Digital Twin for Probabilistic Failure Forecasting and Predictive Maintenance**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Tests: 185 passed](https://img.shields.io/badge/tests-185%20passed-brightgreen.svg)](#testing)
+[![Tests: 205 passed](https://img.shields.io/badge/tests-205%20passed-brightgreen.svg)](#testing)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-orange.svg)](https://docs.astral.sh/ruff/)
 [![Streamlit Dashboard](https://img.shields.io/badge/dashboard-Streamlit-FF4B4B.svg)](#dashboard)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
@@ -234,7 +234,7 @@ stat-twin/
 │   ├── explainability/            # Evidence cards, occlusion, attribution
 │   ├── counterfactual/            # What-If simulator
 │   ├── evaluation/                # Metrics, lead-time, significance tests
-│   ├── decision/                  # Maintenance guidance
+│   ├── decision/                  # Maintenance guidance (wired into Overview)
 │   ├── dashboard/                 # Streamlit app + 7 views + components
 │   │   ├── app.py                 # Entry point (sidebar nav, hero, dispatch)
 │   │   ├── components/            # theme.py · cards.py · charts.py · live.py
@@ -242,7 +242,7 @@ stat-twin/
 │   ├── experiments/               # Runnable experiments E0–E9
 │   └── reports/                   # Report generation
 │
-├── tests/                         # 185 tests (unit + leakage guard)
+├── tests/                         # 205 tests (unit + leakage guard)
 │   └── leakage_guard/             # 43 leakage-specific proofs
 │
 ├── results/                       # Experiment artifacts (JSON + figures)
@@ -410,7 +410,15 @@ A **7-page Streamlit dashboard** with a dark industrial theme, live 2-second aut
 | 04 | **Failure Forecast** | Multi-horizon probability curve, RUL with conformal interval |
 | 05 | **Explainability** | Evidence cards, sensor contributions, risk-change decomposition |
 | 06 | **What-If Simulator** | Sensor sliders, original → simulated, SIMULATION disclaimer |
-| 07 | **Model Comparison** | Metrics table, early warning, ablation forest plot, calibration |
+| 07 | **Model Comparison** | Real e2/e5 metrics (AUC, Brier, ECE), calibration, conformal coverage |
+
+**Build dashboard data first** (writes real C-MAPSS artifacts under `results/`):
+
+```bash
+make app-data
+# or
+python -m stattwin.app_data --ds FD001 --machine MACHINE-001
+```
 
 **Launch:**
 
@@ -420,7 +428,7 @@ make app
 python -m streamlit run src/stattwin/dashboard/app.py --server.headless true --server.port 8501
 ```
 
-Then open **http://localhost:8501**.
+Then open **http://localhost:8501**. Without `app-data`, views fall back to clearly labelled demo streams (SIMULATED).
 
 **Design system** (`src/stattwin/dashboard/components/theme.py`):
 
@@ -435,10 +443,10 @@ Then open **http://localhost:8501**.
 
 ## Testing
 
-**185 tests, all passing** — including the Leakage Guard suite.
+**205 tests, all passing** — including the Leakage Guard suite.
 
 ```bash
-make test              # full suite (185 tests)
+make test              # full suite (205 tests)
 make test-leakage      # leakage guard only
 ```
 

@@ -21,7 +21,6 @@ from stattwin.preprocessing.outliers import (
 )
 from stattwin.preprocessing.scaler import PerConditionScaler, TrainFittedScaler
 
-
 # ---------------------------------------------------------------------------
 # Missing value imputation
 # ---------------------------------------------------------------------------
@@ -195,7 +194,7 @@ class TestDQ:
         assert "spike" not in decoded
 
     def test_dq_engine_fit_transform(self, synthetic_dataset):
-        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]
+        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:3]  # noqa: E501
         config = DQConfig(
             sensor_columns=sensor_cols,
             dropout_burst_k=3,

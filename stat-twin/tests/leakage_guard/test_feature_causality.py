@@ -1,8 +1,7 @@
-"""Leakage Guard: Features at t computed on full trajectory = features on trajectory truncated at t."""
+"""Leakage Guard: Features at t computed on full trajectory = features on trajectory truncated at t."""  # noqa: E501
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -30,7 +29,7 @@ from stattwin.statistics.shift import (
 
 
 class TestFeatureCausality:
-    """Features at t computed on full trajectory = features on trajectory truncated at t (truncation invariance)."""
+    """Features at t computed on full trajectory = features on trajectory truncated at t (truncation invariance)."""  # noqa: E501
 
     @pytest.fixture()
     def unit_df(self):
@@ -54,7 +53,7 @@ class TestFeatureCausality:
         ],
     )
     def test_rolling_truncation_invariance(self, unit_df, func, kwargs):
-        """Rolling features at cycle t are identical whether computed on full or truncated trajectory."""
+        """Rolling features at cycle t are identical whether computed on full or truncated trajectory."""  # noqa: E501
         t = 80
         col = "sensor_1"
 

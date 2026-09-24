@@ -16,7 +16,6 @@ Given a fitted model's ``ModelResult``, this module produces:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -67,7 +66,7 @@ class ForecastProfile:
     interp_y: np.ndarray
     rul_point: float
     failure_cycle_hat: float
-    interval: Optional[Tuple[float, float]] = None
+    interval: tuple[float, float] | None = None
     t_now: float = 0.0
 
 
@@ -97,8 +96,8 @@ class ConsistencyReport:
     spearman_rho: float
     kendall_tau: float
     monotonicity_violations: int
-    rul_at_50_pct: Optional[float]
-    failure_cycle_at_50_pct: Optional[float]
+    rul_at_50_pct: float | None
+    failure_cycle_at_50_pct: float | None
     is_consistent: bool
 
 
@@ -108,9 +107,9 @@ class ConsistencyReport:
 
 def build_probability_curve(
     proba_row: pd.Series,
-    horizons: Optional[List[int]] = None,
+    horizons: list[int] | None = None,
     n_interp_points: int = 200,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Build a smooth monotone probability curve from per-horizon predictions.
 
     Parameters
@@ -160,9 +159,9 @@ def build_probability_curve(
 def build_rul_profile(
     rul_value: float,
     t_now: float = 0.0,
-    sigma_ens: Optional[float] = None,
-    conformal_q: Optional[float] = None,
-) -> Tuple[float, float, Optional[Tuple[float, float]]]:
+    sigma_ens: float | None = None,
+    conformal_q: float | None = None,
+) -> tuple[float, float, tuple[float, float] | None]:
     """Derive RUL point estimate and predicted failure cycle with interval.
 
     Parameters
@@ -190,7 +189,7 @@ def build_rul_profile(
     rul_clipped = max(float(rul_value), 0.0)
     failure_hat = t_now + rul_clipped
 
-    interval: Optional[Tuple[float, float]] = None
+    interval: tuple[float, float] | None = None
     if conformal_q is not None and sigma_ens is not None:
         spread = conformal_q * (sigma_ens + 1e-12)
         lower = max(t_now + rul_clipped - spread, t_now)
@@ -211,8 +210,8 @@ def build_rul_profile(
 def predicted_failure_point(
     rul_series: pd.Series,
     cycle_series: pd.Series,
-    sigma_ens: Optional[pd.Series] = None,
-    conformal_q: Optional[float] = None,
+    sigma_ens: pd.Series | None = None,
+    conformal_q: float | None = None,
 ) -> pd.DataFrame:
     """Compute predicted failure point for every row in a dataset.
 
@@ -266,7 +265,7 @@ def check_consistency(
     proba_row: pd.Series,
     rul_point: float,
     t_now: float = 0.0,
-    horizons: Optional[List[int]] = None,
+    horizons: list[int] | None = None,
     n_interp_points: int = 200,
 ) -> ConsistencyReport:
     """Compare the probability curve with the RUL point estimate.
@@ -313,8 +312,8 @@ def check_consistency(
     n_violations = int(np.sum(diffs < -1e-12))
 
     # --- 50 % crossing point ---
-    rul_at_50: Optional[float] = None
-    failure_at_50: Optional[float] = None
+    rul_at_50: float | None = None
+    failure_at_50: float | None = None
     above_50 = interp_y >= 0.50
     if above_50.any():
         # first x where curve >= 0.50

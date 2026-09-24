@@ -202,15 +202,34 @@ def recommendation_card(
     )
 
 
-def delta_card(label: str, original: float, simulated: float, *, fmt: str = ".3f"):
-    """Show original → simulated with color-coded delta."""
+def delta_card(
+    label: str,
+    original: float,
+    simulated: float,
+    *,
+    fmt: str = ".3f",
+    higher_is_better: bool = True,
+    provenance: str = "SIMULATED",
+):
+    """Show original → simulated with color-coded delta.
+
+    ``higher_is_better`` controls delta colour: green when the change is
+    favourable (e.g. higher SHI / higher RUL, or lower risk metrics when
+    set to ``False``).
+    """
     delta = simulated - original
     sign = "+" if delta >= 0 else ""
-    colour = DANGER if delta < 0 else SUCCESS
+    if abs(delta) < 1e-15:
+        colour = MUTED
+    elif (delta > 0) == higher_is_better:
+        colour = SUCCESS
+    else:
+        colour = DANGER
+    prov_html = f" {provenance_badge(provenance)}" if provenance else ""
     st.markdown(
         f"""
         <div class="st-kpi">
-            <div class="st-kpi-label">{label}</div>
+            <div class="st-kpi-label">{label}{prov_html}</div>
             <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
                 <span class="st-kpi-value" style="font-size:1.1rem;">{original:{fmt}}</span>
                 <span style="color:{MUTED};">→</span>

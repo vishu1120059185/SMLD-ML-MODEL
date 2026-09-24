@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import argparse
 import copy
-import json
 from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -26,7 +26,7 @@ import pandas as pd
 from stattwin.config import load_config
 from stattwin.data.loader import load_cmapss
 from stattwin.data.schema import FAILURE_HORIZONS, label_col_for
-from stattwin.data.splitter import make_group_kfold_splits, inner_unit_split
+from stattwin.data.splitter import inner_unit_split, make_group_kfold_splits
 from stattwin.evaluation.lead_time import (
     LeadTimeReport,
     lead_time_analysis,
@@ -43,7 +43,6 @@ from ._common import (
     save_json,
     setup_output,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -88,7 +87,7 @@ def _run_early_warning_for_model(
         X_tr = X[X["unit_id"].isin(train_units)].copy()
         X_val = X[X["unit_id"].isin(val_units)].copy()
         y_tr = y.loc[X_tr.index]
-        y_val = y.loc[X_val.index]
+        y.loc[X_val.index]
 
         m = copy.deepcopy(model)
         try:
@@ -226,7 +225,7 @@ def _plot_far_vs_lead(all_results: list[dict], out_dir: Path) -> None:
 
 def run_e3(cfg, df, out_dir) -> dict[str, Any]:
     """Run early-warning benchmark."""
-    sensor_cols = [c for c in SENSOR_COLS if c in df.columns]
+    [c for c in SENSOR_COLS if c in df.columns]
     feature_cols = feature_columns(df, include_health=True)
 
     label_cols = [label_col_for(h) for h in FAILURE_HORIZONS]
@@ -253,7 +252,7 @@ def run_e3(cfg, df, out_dir) -> dict[str, Any]:
         result["elapsed_seconds"] = t.elapsed
         all_results.append(result)
         if "error" not in result:
-            print(f"    Mean lead time: {result['mean_lead_time']:.1f}  FAR: {result['mean_far']:.4f}")
+            print(f"    Mean lead time: {result['mean_lead_time']:.1f}  FAR: {result['mean_far']:.4f}")  # noqa: E501
         else:
             print(f"    {result['error']}")
 
@@ -288,7 +287,7 @@ def main() -> None:
     out_dir = setup_output("e3_early_warning")
 
     with Timer() as t:
-        results = run_e3(cfg, df, out_dir)
+        run_e3(cfg, df, out_dir)
 
     print(f"\n[e3] Completed in {t.elapsed:.1f}s")
     print(f"     Output: {out_dir}")

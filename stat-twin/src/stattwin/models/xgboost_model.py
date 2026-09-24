@@ -16,7 +16,8 @@ References
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -74,17 +75,17 @@ class XGBoostModel(BaseModel):
         self.min_child_weight = min_child_weight
         self.random_state = random_state
 
-        self._classifiers: Dict[int, Any] = {}
+        self._classifiers: dict[int, Any] = {}
         self._regressor: Any = None
-        self._sensor_cols: List[str] = []
-        self._isotonic_probas: Dict[int, IsotonicRegression] = {}
+        self._sensor_cols: list[str] = []
+        self._isotonic_probas: dict[int, IsotonicRegression] = {}
         self._isotonic_rul: IsotonicRegression | None = None
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _select_features(self, X: pd.DataFrame) -> List[str]:
+    def _select_features(self, X: pd.DataFrame) -> list[str]:
         """Return raw sensor columns only."""
         return [
             c for c in X.columns
@@ -151,7 +152,7 @@ class XGBoostModel(BaseModel):
         self,
         X_train: pd.DataFrame,
         y_train: pd.DataFrame,
-        groups: Optional[np.ndarray] = None,
+        groups: np.ndarray | None = None,
     ) -> XGBoostModel:
         """Fit per-horizon classifiers, RUL regressor, and isotonic calibrators.
 
@@ -210,7 +211,7 @@ class XGBoostModel(BaseModel):
 
     def _predict_proba_raw(self, X_arr: np.ndarray) -> pd.DataFrame:
         """Raw probability prediction before isotonic calibration."""
-        proba_dict: Dict[str, np.ndarray] = {}
+        proba_dict: dict[str, np.ndarray] = {}
         for h in self.horizons:
             clf = self._classifiers.get(h)
             if clf is not None:
@@ -261,9 +262,9 @@ class XGBoostModel(BaseModel):
         return pd.Series(scores, index=X.index, name="raw_score")
 
     @property
-    def feature_importances_(self) -> Dict[int, np.ndarray]:
+    def feature_importances_(self) -> dict[int, np.ndarray]:
         """Return per-horizon feature importances from fitted classifiers."""
-        result: Dict[int, np.ndarray] = {}
+        result: dict[int, np.ndarray] = {}
         for h, clf in self._classifiers.items():
             result[h] = clf.feature_importances_
         return result

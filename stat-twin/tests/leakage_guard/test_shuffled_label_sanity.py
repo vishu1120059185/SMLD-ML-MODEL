@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from stattwin.data.schema import FAILURE_HORIZONS, label_col_for
-from stattwin.data.synthetic import make_synthetic_dataset
 
 
 class TestShuffledLabelSanity:
@@ -16,7 +14,7 @@ class TestShuffledLabelSanity:
         from stattwin.models.xgboost_model import XGBoostModel
 
         df = synthetic_dataset.copy()
-        sensor_cols = [c for c in df.columns if c.startswith("sensor_") and df[c].sum() != 0][:3]
+        [c for c in df.columns if c.startswith("sensor_") and df[c].sum() != 0][:3]
         exclude = {"unit_id", "cycle", "RUL"}
         exclude.update(label_col_for(h) for h in FAILURE_HORIZONS)
         feature_cols = [

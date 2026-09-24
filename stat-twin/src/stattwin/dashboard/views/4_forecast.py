@@ -1,13 +1,11 @@
 """Page 4 — FAILURE FORECAST: live probability, RUL countdown, conformal bands."""
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
+from stattwin.dashboard.components.artifacts import load_artifact as _load
 from stattwin.dashboard.components.cards import (
     kpi_card,
     page_header,
@@ -26,23 +24,6 @@ from stattwin.dashboard.components.live import (
     rul_countdown,
     slide_window,
 )
-
-RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
-
-
-def _load(name: str, machine: str | None = None):
-    candidates = []
-    if machine:
-        candidates.append(RESULTS_DIR / machine / name)
-    candidates.append(RESULTS_DIR / "global" / name)
-    candidates.append(RESULTS_DIR / name)
-    for p in candidates:
-        if p.exists():
-            try:
-                return json.loads(p.read_text())
-            except Exception:
-                continue
-    return None
 
 
 def render() -> None:
@@ -78,24 +59,24 @@ def render() -> None:
         c1, c2, c3, c4 = st.columns(4)
         with c1:
             kpi_card(
-                "P(Failure +30d)",
+                "P(Failure +30 cycles)",
                 f"{fp30:.1%}",
                 delta=f"live · tick #{tick}",
-                provenance="PREDICTED",
+                provenance="PREDICTED" if not demo_mode else "SIMULATED",
             )
         with c2:
             ci_str = f"[{rul_ci[0]:.0f} – {rul_ci[1]:.0f}]" if has_ci else ""
             kpi_card(
-                "RUL (days)",
+                "RUL (cycles)",
                 f"{rul:.1f} {ci_str}".strip(),
                 delta="counting down · live",
-                provenance="PREDICTED",
+                provenance="PREDICTED" if not demo_mode else "SIMULATED",
             )
         with c3:
             kpi_card(
                 "Model",
                 str(forecast.get("model", "ensemble")),
-                provenance="PREDICTED",
+                provenance="PREDICTED" if not demo_mode else "SIMULATED",
             )
         with c4:
             st.plotly_chart(
@@ -193,11 +174,11 @@ def render() -> None:
                 go.Indicator(
                     mode="number+delta",
                     value=rul,
-                    number=dict(suffix=" days", font=dict(size=36)),
+                    number=dict(suffix=" cycles", font=dict(size=36)),
                     delta=dict(
                         reference=forecast.get("rul_prev", rul_base),
                         valueformat=".1f",
-                        suffix=" d",
+                        suffix=" c",
                     ),
                     title=dict(text="Remaining Useful Life", font=dict(size=14)),
                 )
@@ -239,7 +220,7 @@ def render() -> None:
                     font=dict(color="#F9FAFB"),
                     height=200,
                     margin=dict(l=20, r=20, t=30, b=10),
-                    xaxis=dict(title="Days", gridcolor="#1F2937"),
+                    xaxis=dict(title="Cycles", gridcolor="#1F2937"),
                     yaxis=dict(gridcolor="#1F2937"),
                     showlegend=True,
                 )
@@ -359,6 +340,7 @@ def _demo_forecast() -> dict:
         "rul": 42,
         "rul_ci": [28, 58],
         "model": "ensemble (demo)",
+        "demo": True,
         "horizon_probs": {
             str(h): p for h, p in zip(horizons, probs, strict=False)
         },

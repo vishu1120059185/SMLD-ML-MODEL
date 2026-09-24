@@ -12,9 +12,9 @@ from stattwin.evaluation.metrics import (
     probabilistic_metrics,
 )
 from stattwin.evaluation.significance import (
+    holm_bonferroni,
     paired_bootstrap_ci,
     paired_wilcoxon,
-    holm_bonferroni,
 )
 
 __all__ = [

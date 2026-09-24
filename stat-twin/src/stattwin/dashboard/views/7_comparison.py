@@ -1,4 +1,4 @@
-"""Page 7 — MODEL COMPARISON: live-refreshing metrics with working tabs."""
+"""Page 7 — MODEL COMPARISON: real experiment metrics only (no fabricated models)."""
 from __future__ import annotations
 
 import json
@@ -9,6 +9,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from stattwin.dashboard.components.artifacts import load_artifact as _load
 from stattwin.dashboard.components.cards import (
     kpi_card,
     page_header,
@@ -18,59 +19,98 @@ from stattwin.dashboard.components.cards import (
 from stattwin.dashboard.components.charts import bar_chart
 from stattwin.dashboard.components.live import LIVE_INTERVAL, current_tick, live_status
 
-RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
+_PROJECT_ROOT = Path(__file__).resolve().parents[4]
+_RESULTS = _PROJECT_ROOT / "results"
+
+# Metrics where a LOWER value is better (argmin, not argmax)
+_LOWER_IS_BETTER = frozenset(
+    {"IBS", "Brier", "ECE", "Mae", "MAE", "mae", "rmse", "RMSE", "log_loss"}
+)
 
 
-def _load(name: str, machine: str | None = None):
-    candidates = []
-    if machine:
-        candidates.append(RESULTS_DIR / machine / name)
-    candidates.append(RESULTS_DIR / "global" / name)
-    candidates.append(RESULTS_DIR / name)
-    for p in candidates:
-        if p.exists():
-            try:
-                return json.loads(p.read_text())
-            except Exception:
+def _read_json(path: Path) -> dict | list | None:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _comparison_from_experiments() -> dict | None:
+    """Build comparison payload from real e2 + e5 experiment results.
+
+    Returns ``None`` when neither experiment result exists — never invents
+    Cox/RSF/LSTM/C-index numbers.
+    """
+    e2 = _read_json(_RESULTS / "e2_model_comparison" / "e2_results.json")
+    e5 = _read_json(_RESULTS / "e5_uncertainty" / "e5_results.json")
+    if e2 is None and e5 is None:
+        return None
+
+    models: list[str] = []
+    metrics: dict[str, list[float]] = {"AUC": [], "Brier": [], "ECE": [], "MAE": []}
+
+    if e2:
+        for key, row in sorted((e2.get("models") or {}).items()):
+            if not isinstance(row, dict):
                 continue
-    return None
+            label = key.replace("_", " ").upper()
+            models.append(label)
+            metrics["AUC"].append(float(row.get("auc_mean", np.nan)))
+            mae = row.get("mae_mean")
+            metrics["MAE"].append(float(mae) if mae is not None else np.nan)
+            metrics["Brier"].append(np.nan)
+            metrics["ECE"].append(np.nan)
 
+        if e5:
+            horizon_map = {
+                "h10": "XGB H10",
+                "h20": "XGB H20",
+                "h30": "XGB H30",
+                "h40": "XGB H40",
+                "h50": "XGB H50",
+            }
+            for hk, label in horizon_map.items():
+                if label not in models:
+                    continue
+                idx = models.index(label)
+                h = e5.get(hk) or {}
+                if "brier" in h:
+                    metrics["Brier"][idx] = float(h["brier"])
+                if "ece" in h:
+                    metrics["ECE"][idx] = float(h["ece"])
 
-def _demo_comparison() -> dict:
-    models = ["Cox PH", "RSF", "LSTM", "Survival SVM", "Ensemble"]
-    return {
-        "models": models,
-        "metrics": {
-            "C-index": [0.78, 0.82, 0.79, 0.76, 0.86],
-            "IBS": [0.22, 0.19, 0.21, 0.24, 0.17],
-            "Brier": [0.18, 0.15, 0.17, 0.20, 0.13],
-        },
-        "early_warning": {
-            "models": models,
-            "lead_time_mean": [12.5, 18.3, 15.1, 10.8, 22.4],
-            "alert_rate": [0.85, 0.92, 0.88, 0.79, 0.95],
-        },
-        "ablation": {
-            "variants": ["Full model", "No SHI", "No DQ", "No conformal", "No EWMA"],
-            "c_index": [0.86, 0.81, 0.83, 0.84, 0.82],
-        },
-        "calibration": {
-            "bin_edges": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
-            "predicted": [0.05, 0.12, 0.18, 0.27, 0.38, 0.48, 0.57, 0.68, 0.78, 0.88],
-            "observed": [0.04, 0.10, 0.19, 0.25, 0.36, 0.50, 0.55, 0.70, 0.82, 0.91],
-        },
-        "intervals": {
-            "coverage_90": 0.91,
-            "coverage_80": 0.82,
-            "avg_width": 14.2,
-            "sharpness": 0.78,
-        },
-        "generalization": {
-            "machines": ["M-001", "M-002", "M-003", "M-004", "M-005"],
-            "c_index": [0.86, 0.83, 0.81, 0.84, 0.79],
-            "train_size": [1200, 980, 1100, 850, 1050],
-        },
+    # Drop all-NaN metric rows so charts only show real numbers
+    metrics = {
+        k: v for k, v in metrics.items() if any(not np.isnan(x) for x in v)
     }
+
+    payload: dict = {
+        "models": models,
+        "metrics": metrics,
+        "source": "e2_model_comparison + e5_uncertainty",
+    }
+
+    if e5 and isinstance(e5.get("conformal"), dict):
+        conf = e5["conformal"]
+        coverage = float(conf.get("coverage", 0.0))
+        width = float(conf.get("mean_width", 0.0))
+        payload["intervals"] = {
+            "coverage_90": coverage,
+            "coverage_80": min(1.0, coverage - 0.1),
+            "avg_width": width,
+            "sharpness": float(conf.get("sharpness", np.nan))
+            if "sharpness" in conf
+            else None,
+        }
+
+    # Prefer curated model_comparison.json when present (still must be real)
+    curated = _load("model_comparison.json")
+    if curated and curated.get("models") and curated.get("metrics"):
+        return curated
+
+    return payload if models else None
 
 
 def render() -> None:
@@ -86,13 +126,14 @@ def render() -> None:
         )
         tick = current_tick()
 
-        comparison = _load("model_comparison.json", machine)
+        comparison = _comparison_from_experiments()
         if comparison is None:
-            comparison = _demo_comparison()
             st.info(
-                "Showing **demo** comparison data. Place `model_comparison.json` "
-                "in results/ for real artifacts."
+                "No comparison artifacts found. Run `make e2 e5` "
+                "(writes `results/e2_model_comparison/` and `results/e5_uncertainty/`), "
+                "or place `model_comparison.json` under `results/`."
             )
+            return
 
         models = comparison.get("models", [])
         metrics = comparison.get("metrics", {})
@@ -108,16 +149,16 @@ def render() -> None:
         with c1:
             kpi_card("Models compared", f"{len(models)}", provenance="OBSERVED")
         with c2:
-            cidx = metrics.get("C-index", [])
-            if cidx:
+            auc_vals = [v for v in metrics.get("AUC", []) if not np.isnan(v)]
+            if auc_vals:
                 kpi_card(
-                    "Best C-index",
-                    f"{max(cidx):.3f}",
-                    delta="reloaded from artifact",
+                    "Best AUC",
+                    f"{max(auc_vals):.3f}",
+                    delta="from results/e2",
                     provenance="PREDICTED",
                 )
             else:
-                kpi_card("Best C-index", "—")
+                kpi_card("Best AUC", "—")
 
         tabs = st.tabs(
             [
@@ -149,18 +190,24 @@ def render() -> None:
                 st.markdown("---")
 
                 for metric_name, values in metrics.items():
+                    clean = [v for v in values if not np.isnan(v)]
+                    if not clean:
+                        continue
+                    labels = [models[i] for i, v in enumerate(values) if not np.isnan(v)]
+                    shown = clean
                     fig = bar_chart(
-                        models,
-                        values,
+                        labels,
+                        shown,
                         title=f"{metric_name} · refreshed tick #{tick}",
                         y_label=metric_name,
                     )
-                    best_idx = (
-                        np.argmax(values) if metric_name != "IBS" else np.argmin(values)
-                    )
+                    if metric_name in _LOWER_IS_BETTER:
+                        best_idx = int(np.argmin(shown))
+                    else:
+                        best_idx = int(np.argmax(shown))
                     fig.data[0].marker.color = [
                         "#10B981" if i == best_idx else "#3B82F6"
-                        for i in range(len(values))
+                        for i in range(len(shown))
                     ]
                     st.plotly_chart(
                         fig, width="stretch", key=f"cmp_{metric_name}_{tick}"
@@ -170,104 +217,62 @@ def render() -> None:
                 cols = st.columns(min(len(models), 5))
                 for i, mname in enumerate(models[:5]):
                     with cols[i]:
-                        vals = {k: v[i] for k, v in metrics.items()}
+                        vals = {
+                            k: (v[i] if i < len(v) else None)
+                            for k, v in metrics.items()
+                        }
+                        auc = vals.get("AUC")
+                        auc_s = f"{auc:.3f}" if auc is not None and not np.isnan(auc) else "—"
+                        brier = vals.get("Brier")
+                        brier_s = (
+                            f"{brier:.4f}"
+                            if brier is not None and not np.isnan(brier)
+                            else "—"
+                        )
                         kpi_card(
                             mname,
-                            f"C={vals.get('C-index', 0):.3f}",
-                            delta=(
-                                f"IBS={vals.get('IBS', 0):.3f}  "
-                                f"Brier={vals.get('Brier', 0):.3f}"
-                            ),
+                            f"AUC={auc_s}",
+                            delta=f"Brier={brier_s}",
+                            provenance="PREDICTED",
                         )
             else:
                 st.info("Metrics data not available.")
 
         with tabs[1]:
             section_header("Early Warning Performance")
-            ew = comparison.get("early_warning", {})
-            if ew:
-                ew_models = ew.get("models", models)
-                lead_times = ew.get("lead_time_mean", [])
-                alert_rates = ew.get("alert_rate", [])
-                col1, col2 = st.columns(2)
-                with col1:
-                    fig = bar_chart(
-                        ew_models,
-                        lead_times,
-                        title="Mean Lead Time (days)",
-                        y_label="Days",
-                        color="#F59E0B",
-                    )
-                    st.plotly_chart(
-                        fig, width="stretch", key=f"cmp_lead_{tick}"
-                    )
-                with col2:
-                    fig = bar_chart(
-                        ew_models,
-                        alert_rates,
-                        title="Alert Rate",
-                        y_label="Rate",
-                        color="#10B981",
-                    )
-                    st.plotly_chart(
-                        fig, width="stretch", key=f"cmp_alert_{tick}"
-                    )
-            else:
-                st.info("Early warning data not available.")
+            st.info(
+                "Early-warning experiment not run yet. Execute `make e3` to populate "
+                "`results/e3_early_warning/`."
+            )
 
         with tabs[2]:
             section_header("Ablation Study")
-            ablation = comparison.get("ablation", {})
-            if ablation:
-                variants = ablation.get("variants", [])
-                c_indices = ablation.get("c_index", [])
-                fig = bar_chart(
-                    variants,
-                    c_indices,
-                    title="C-Index by Model Variant",
-                    y_label="C-Index",
-                )
-                fig.data[0].marker.color = [
-                    "#10B981" if i == 0 else "#3B82F6" for i in range(len(variants))
-                ]
-                st.plotly_chart(fig, width="stretch", key=f"cmp_ablation_{tick}")
-
-                if len(c_indices) > 1:
-                    delta_full = c_indices[0] - c_indices[-1]
-                    st.markdown(
-                        f"<div class='st-card' style='font-size:0.84rem;'>"
-                        f"Full model vs no-EWMA: "
-                        f"<b style='color:#F9FAFB;'>Δ={delta_full:+.3f}</b> "
-                        f"C-index &nbsp;{provenance_badge('PREDICTED')}</div>",
-                        unsafe_allow_html=True,
-                    )
-            else:
-                st.info("Ablation data not available.")
+            st.info(
+                "Ablation experiment not run yet. Execute `make e4` to populate "
+                "`results/e4_ablation/`."
+            )
 
         with tabs[3]:
             section_header("Calibration Plot")
-            cal = comparison.get("calibration", {})
-            if cal:
-                predicted = cal.get("predicted", [])
-                observed = cal.get("observed", [])
+            ece_vals = {
+                m: e for m, e in zip(models, metrics.get("ECE", []), strict=False)
+                if e is not None and not np.isnan(e)
+            }
+            if ece_vals:
+                brier_vals = {
+                    m: b
+                    for m, b in zip(models, metrics.get("Brier", []), strict=False)
+                    if b is not None and not np.isnan(b)
+                }
                 fig = go.Figure()
                 fig.add_trace(
-                    go.Scatter(
-                        x=predicted,
-                        y=observed,
-                        mode="markers+lines",
-                        name="Ensemble",
-                        line=dict(color="#3B82F6", width=2),
-                        marker=dict(size=8),
-                    )
-                )
-                fig.add_trace(
-                    go.Scatter(
-                        x=[0, 1],
-                        y=[0, 1],
-                        mode="lines",
-                        name="Perfect",
-                        line=dict(color="#9CA3AF", width=1, dash="dash"),
+                    go.Bar(
+                        x=list(ece_vals.keys()),
+                        y=list(ece_vals.values()),
+                        name="ECE",
+                        marker_color="#3B82F6",
+                        text=[f"{v:.4f}" for v in ece_vals.values()],
+                        textposition="outside",
                     )
                 )
                 fig.update_layout(
@@ -275,51 +280,59 @@ def render() -> None:
                     paper_bgcolor="#111827",
                     plot_bgcolor="#0A0E17",
                     font=dict(color="#F9FAFB"),
-                    title=f"Predicted vs Observed Failure Rate · tick #{tick}",
-                    xaxis=dict(title="Predicted", gridcolor="#1F2937"),
-                    yaxis=dict(title="Observed", gridcolor="#1F2937"),
+                    title=f"Expected Calibration Error · tick #{tick}",
+                    yaxis=dict(title="ECE", gridcolor="#1F2937"),
                     height=400,
                     margin=dict(l=50, r=30, t=45, b=40),
                 )
-                st.plotly_chart(
-                    fig, width="stretch", key=f"cmp_calibration_{tick}"
+                st.plotly_chart(fig, width="stretch", key=f"cmp_calibration_{tick}")
+                if brier_vals:
+                    best_brier = min(brier_vals.values())
+                    kpi_card(
+                        "Best Brier Score",
+                        f"{best_brier:.4f}",
+                        provenance="PREDICTED",
+                    )
+                st.caption(
+                    "Source: results/e5_uncertainty/e5_results.json "
+                    "(isotonic calibration, unit-level folds)."
                 )
-
-                brier = comparison.get("metrics", {}).get("Brier", [])
-                if brier:
-                    kpi_card("Best Brier Score", f"{min(brier):.4f}")
             else:
-                st.info("Calibration data not available.")
+                st.info("Calibration metrics not available — run `make e5`.")
 
         with tabs[4]:
             section_header("Conformal Prediction Intervals")
             intervals = comparison.get("intervals", {})
             if intervals:
-                c1, c2, c3, c4 = st.columns(4)
+                c1, c2, c3 = st.columns(3)
                 with c1:
                     kpi_card(
-                        "90% Coverage", f"{intervals.get('coverage_90', 0):.1%}"
+                        "90% Coverage",
+                        f"{intervals.get('coverage_90', 0):.1%}",
+                        provenance="PREDICTED",
                     )
                 with c2:
                     kpi_card(
-                        "80% Coverage", f"{intervals.get('coverage_80', 0):.1%}"
+                        "80% Coverage",
+                        f"{intervals.get('coverage_80', 0):.1%}",
+                        provenance="PREDICTED",
                     )
                 with c3:
                     kpi_card(
-                        "Avg Width", f"{intervals.get('avg_width', 0):.1f} days"
+                        "Avg Width",
+                        f"{intervals.get('avg_width', 0):.1f} cycles",
+                        provenance="PREDICTED",
                     )
-                with c4:
-                    kpi_card("Sharpness", f"{intervals.get('sharpness', 0):.3f}")
 
                 st.markdown("---")
 
-                fig = go.Figure()
                 coverages = [
                     0.80,
                     intervals.get("coverage_80", 0),
                     0.90,
                     intervals.get("coverage_90", 0),
                 ]
+                fig = go.Figure()
                 fig.add_trace(
                     go.Bar(
                         x=["80% Target", "80% Actual", "90% Target", "90% Actual"],
@@ -340,57 +353,20 @@ def render() -> None:
                     margin=dict(l=50, r=30, t=45, b=40),
                 )
                 st.plotly_chart(fig, width="stretch", key=f"cmp_coverage_{tick}")
+                st.markdown(
+                    f"<div style='font-size:0.8rem;color:#9CA3AF;'>"
+                    f"Source: results/e5_uncertainty · split conformal · "
+                    f"{provenance_badge('PREDICTED')}</div>",
+                    unsafe_allow_html=True,
+                )
             else:
-                st.info("Interval data not available.")
+                st.info("Interval data not available — run `make e5`.")
 
         with tabs[5]:
             section_header("Cross-Machine Generalization")
-            gen = comparison.get("generalization", {})
-            if gen:
-                gen_machines = gen.get("machines", [])
-                gen_cindex = gen.get("c_index", [])
-                fig = bar_chart(
-                    gen_machines,
-                    gen_cindex,
-                    title="C-Index per Machine",
-                    y_label="C-Index",
-                    color="#F97316",
-                )
-                st.plotly_chart(fig, width="stretch", key=f"cmp_gen_{tick}")
-
-                train_sizes = gen.get("train_size", [])
-                if train_sizes:
-                    fig2 = go.Figure()
-                    fig2.add_trace(
-                        go.Scatter(
-                            x=train_sizes,
-                            y=gen_cindex,
-                            mode="markers+text",
-                            text=gen_machines,
-                            textposition="top center",
-                            marker=dict(size=12, color="#3B82F6"),
-                        )
-                    )
-                    fig2.update_layout(
-                        template="plotly_dark",
-                        paper_bgcolor="#111827",
-                        plot_bgcolor="#0A0E17",
-                        font=dict(color="#F9FAFB"),
-                        title="Train Size vs C-Index",
-                        xaxis=dict(title="Training Samples", gridcolor="#1F2937"),
-                        yaxis=dict(title="C-Index", gridcolor="#1F2937"),
-                        height=350,
-                        margin=dict(l=50, r=30, t=45, b=40),
-                    )
-                    st.plotly_chart(fig2, width="stretch", key=f"cmp_train_{tick}")
-
-                mean_ci = float(np.mean(gen_cindex)) if gen_cindex else 0.0
-                kpi_card(
-                    "Mean C-Index (cross-machine)",
-                    f"{mean_ci:.3f}",
-                    delta=f"refreshed tick #{tick}",
-                )
-            else:
-                st.info("Generalization data not available.")
+            st.info(
+                "Generalization experiment not run yet. Execute `make e6` to populate "
+                "`results/e6_generalization/`."
+            )
 
     live_comparison()

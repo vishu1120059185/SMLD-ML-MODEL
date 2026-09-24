@@ -16,11 +16,8 @@ from stattwin.statistics.rolling import (
 )
 from stattwin.statistics.shift import (
     DistributionShift,
-    ks_statistic,
     population_stability_index,
-    wasserstein_distance,
 )
-
 
 # ---------------------------------------------------------------------------
 # Truncation invariance
@@ -208,7 +205,7 @@ class TestPSI:
         assert late_psi > 0.1
 
     def test_distribution_shift_wrapper(self, synthetic_dataset):
-        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:2]
+        sensor_cols = [c for c in synthetic_dataset.columns if c.startswith("sensor_") and synthetic_dataset[c].sum() != 0][:2]  # noqa: E501
         ds = DistributionShift(methods=["psi"], window=5, baseline_cycles=20)
         result = ds.compute(synthetic_dataset, sensor_cols=sensor_cols)
         assert result.shape[0] == synthetic_dataset.shape[0]

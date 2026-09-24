@@ -5,20 +5,14 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from sklearn.metrics import (
-    brier_score_loss,
     f1_score,
     mean_absolute_error,
     mean_squared_error,
-    precision_score,
-    recall_score,
     roc_auc_score,
 )
 
 from stattwin.evaluation.metrics import (
     ClassificationReport,
-    IntervalReport,
-    ProbabilisticReport,
-    RULReport,
     evaluate_classification,
     evaluate_rul,
     interval_metrics,

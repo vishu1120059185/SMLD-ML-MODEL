@@ -10,7 +10,6 @@ from stattwin.data.schema import FAILURE_HORIZONS, label_col_for
 from stattwin.data.synthetic import make_synthetic_dataset
 from stattwin.models.base import BaseModel, ModelResult
 
-
 # ---------------------------------------------------------------------------
 # Minimal concrete model for testing the ABC
 # ---------------------------------------------------------------------------

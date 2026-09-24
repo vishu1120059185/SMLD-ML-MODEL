@@ -12,7 +12,6 @@ from stattwin.explainability.attribution import (
     group_occlusion_attribution,
 )
 
-
 # ---------------------------------------------------------------------------
 # Simple model for attribution tests
 # ---------------------------------------------------------------------------

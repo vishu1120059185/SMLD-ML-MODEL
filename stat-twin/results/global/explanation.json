@@ -1,0 +1,6 @@
+{
+  "summary": "sensor_11 showed Spearman ρ=0.841 with cycle over the unit window (p=1.30e-52). This feature **contributed to the model's risk estimate**; it is not a causal failure claim.",
+  "risk_delta": 0.084114394412099,
+  "timeframe": "full unit lifetime",
+  "provenance": "PREDICTED"
+}

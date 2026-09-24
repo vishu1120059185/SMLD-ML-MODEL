@@ -15,7 +15,6 @@ This module provides:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional
 
 import numpy as np
 from scipy import stats
@@ -95,8 +94,8 @@ class HolmBonferroniResult:
         Family-wise significance level.
     """
 
-    adjusted_p_values: Dict[str, float] = field(default_factory=dict)
-    rejected: Dict[str, bool] = field(default_factory=dict)
+    adjusted_p_values: dict[str, float] = field(default_factory=dict)
+    rejected: dict[str, bool] = field(default_factory=dict)
     alpha: float = 0.05
 
 
@@ -166,7 +165,7 @@ def paired_bootstrap_ci(
     scores_b: np.ndarray,
     n_resamples: int = 10_000,
     confidence_level: float = 0.95,
-    seed: Optional[int] = None,
+    seed: int | None = None,
 ) -> BootstrapCI:
     """Bootstrap confidence interval for the mean paired difference.
 
@@ -221,7 +220,7 @@ def paired_bootstrap_ci(
 # ---------------------------------------------------------------------------
 
 def holm_bonferroni(
-    p_values: Dict[str, float],
+    p_values: dict[str, float],
     alpha: float = 0.05,
 ) -> HolmBonferroniResult:
     """Apply Holm–Bonferroni correction for multiple comparisons.
@@ -244,8 +243,8 @@ def holm_bonferroni(
     sorted_items = sorted(p_values.items(), key=lambda x: x[1])
     m = len(sorted_items)
 
-    adjusted: Dict[str, float] = {}
-    rejected: Dict[str, bool] = {}
+    adjusted: dict[str, float] = {}
+    rejected: dict[str, bool] = {}
 
     for rank, (name, p_val) in enumerate(sorted_items, start=1):
         adj_p = min(p_val * (m - rank + 1), 1.0)

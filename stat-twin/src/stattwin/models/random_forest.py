@@ -13,7 +13,7 @@ References
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -64,17 +64,17 @@ class RandomForestModel(BaseModel):
         self.class_weight = class_weight
         self.random_state = random_state
 
-        self._classifiers: Dict[int, RandomForestClassifier] = {}
+        self._classifiers: dict[int, RandomForestClassifier] = {}
         self._regressor: RandomForestRegressor | None = None
-        self._sensor_cols: List[str] = []
-        self._isotonic_probas: Dict[int, IsotonicRegression] = {}
+        self._sensor_cols: list[str] = []
+        self._isotonic_probas: dict[int, IsotonicRegression] = {}
         self._isotonic_rul: IsotonicRegression | None = None
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _select_features(self, X: pd.DataFrame) -> List[str]:
+    def _select_features(self, X: pd.DataFrame) -> list[str]:
         """Return raw sensor columns only."""
         return [
             c for c in X.columns
@@ -102,7 +102,7 @@ class RandomForestModel(BaseModel):
         self,
         X_train: pd.DataFrame,
         y_train: pd.DataFrame,
-        groups: Optional[np.ndarray] = None,
+        groups: np.ndarray | None = None,
     ) -> RandomForestModel:
         """Fit per-horizon classifiers, RUL regressor, and isotonic calibrators.
 
@@ -173,7 +173,7 @@ class RandomForestModel(BaseModel):
     def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
         """Predict per-horizon failure probabilities."""
         X_arr = self._get_features(X)
-        proba_dict: Dict[str, np.ndarray] = {}
+        proba_dict: dict[str, np.ndarray] = {}
         for h in self.horizons:
             clf = self._classifiers.get(h)
             if clf is None:

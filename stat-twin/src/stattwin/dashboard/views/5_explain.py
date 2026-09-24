@@ -1,12 +1,10 @@
 """Page 5 — EXPLAINABILITY: live evidence cards and attribution bars."""
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import numpy as np
 import streamlit as st
 
+from stattwin.dashboard.components.artifacts import load_artifact as _load
 from stattwin.dashboard.components.cards import (
     evidence_card,
     page_header,
@@ -22,23 +20,6 @@ from stattwin.dashboard.components.live import (
     live_status,
     live_window,
 )
-
-RESULTS_DIR = Path(__file__).resolve().parents[4] / "results"
-
-
-def _load(name: str, machine: str | None = None):
-    candidates = []
-    if machine:
-        candidates.append(RESULTS_DIR / machine / name)
-    candidates.append(RESULTS_DIR / "global" / name)
-    candidates.append(RESULTS_DIR / name)
-    for p in candidates:
-        if p.exists():
-            try:
-                return json.loads(p.read_text())
-            except Exception:
-                continue
-    return None
 
 
 def _demo_explanation() -> dict:
@@ -162,12 +143,13 @@ def render() -> None:
             name=f"{machine}:risk_delta",
         )
         timeframe = explanation.get("timeframe", "last 30 days")
+        risk_colour = "#10B981" if risk_delta < 0 else "#EF4444"
         st.markdown(
             f"""
             <div class="st-card" style="border-left:3px solid #F59E0B;">
                 <div class="st-kpi-label">
                     Risk Delta:
-                    <b style="color:#EF4444;">+{risk_delta:.1%}</b>
+                    <b style="color:{risk_colour};">{risk_delta:+.1%}</b>
                     over <b>{timeframe}</b> · tick #{tick}
                     &nbsp;{provenance_badge('PREDICTED')}
                 </div>

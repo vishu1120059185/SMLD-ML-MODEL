@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import argparse
 import copy
-import json
 from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,10 +27,9 @@ from stattwin.config import load_config
 from stattwin.data.loader import load_cmapss
 from stattwin.data.schema import FAILURE_HORIZONS, label_col_for
 from stattwin.evaluation.metrics import evaluate_classification, evaluate_rul
-from stattwin.models import RandomForestModel, XGBoostModel
+from stattwin.models import XGBoostModel
 
 from ._common import (
-    SENSOR_COLS,
     Timer,
     add_common_args,
     feature_columns,
@@ -38,7 +37,6 @@ from ._common import (
     save_json,
     setup_output,
 )
-
 
 # ---------------------------------------------------------------------------
 # Datasets to try
@@ -151,7 +149,7 @@ def _plot_heatmap(
             val = matrix[i, j]
             if not np.isnan(val):
                 ax.text(j, i, f"{val:.3f}", ha="center", va="center", fontsize=8,
-                        color="black" if val > (vmin or 0) + 0.5 * ((vmax or 1) - (vmin or 0)) else "white")
+                        color="black" if val > (vmin or 0) + 0.5 * ((vmax or 1) - (vmin or 0)) else "white")  # noqa: E501
 
     fig.colorbar(im, ax=ax, shrink=0.8)
     fig.tight_layout()
@@ -192,7 +190,7 @@ def run_e6(cfg, out_dir) -> dict[str, Any]:
             result["elapsed_seconds"] = t.elapsed
             all_results.append(result)
             if "error" not in result:
-                print(f"    ROC-AUC: {result['mean_roc_auc']:.4f}  RUL RMSE: {result['rul_rmse']:.2f}")
+                print(f"    ROC-AUC: {result['mean_roc_auc']:.4f}  RUL RMSE: {result['rul_rmse']:.2f}")  # noqa: E501
             else:
                 print(f"    Error: {result['error']}")
 
@@ -240,7 +238,7 @@ def main() -> None:
     out_dir = setup_output("e6_generalization")
 
     with Timer() as t:
-        results = run_e6(cfg, out_dir)
+        run_e6(cfg, out_dir)
 
     print(f"\n[e6] Completed in {t.elapsed:.1f}s")
     print(f"     Output: {out_dir}")

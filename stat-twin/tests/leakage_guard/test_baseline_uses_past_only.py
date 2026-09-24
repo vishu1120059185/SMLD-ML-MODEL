@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import numpy as np
-import pandas as pd
 import pytest
 
 from stattwin.data.synthetic import make_synthetic_unit
@@ -41,7 +39,7 @@ class TestBaselineUsesPastOnly:
 
         # At cycle 1, baseline is just [x1]
         t1_zscore = result.loc[result["cycle"] == 1, "sensor_1_zscore"].iloc[0]
-        x1 = df.loc[df["cycle"] == 1, "sensor_1"].iloc[0]
+        df.loc[df["cycle"] == 1, "sensor_1"].iloc[0]
         # With only 1 value, sigma=1.0, so z = (x1 - x1)/1 = 0
         assert t1_zscore == pytest.approx(0.0, abs=0.1)
 
