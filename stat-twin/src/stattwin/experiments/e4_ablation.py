@@ -38,9 +38,12 @@ from stattwin.evaluation.significance import (
     paired_bootstrap_ci,
     paired_wilcoxon,
 )
+from stattwin.health.shi import compute_shi
 from stattwin.models import XGBoostModel
+from stattwin.statistics import compute_features
 
 from ._common import (
+    SENSOR_COLS,
     Timer,
     add_common_args,
     resolve_raw_path,
@@ -74,12 +77,31 @@ def _select_features(
         if c not in exclude and pd.api.types.is_numeric_dtype(df[c])
     ]
 
-    raw_sensors = [c for c in all_numeric if c.startswith("sensor_") or c.startswith("op_setting_")]
-    health_cols = [c for c in all_numeric if "shi" in c.lower() or "evidence_" in c.lower() or "health" in c.lower()]  # noqa: E501
+    def _is_raw(name: str) -> bool:
+        # Exact raw names only: sensor_7 / op_setting_3 (not sensor_7_rmean_5)
+        if name.startswith("sensor_"):
+            return name[7:].isdigit()
+        if name.startswith("op_setting_"):
+            return name[11:].isdigit()
+        return False
 
-    stat_temporal = [c for c in all_numeric if c not in raw_sensors and c not in health_cols]
-    stat_only = [c for c in stat_temporal if "rmean_" in c or "rstd_" in c or "zscore" in c]
-    temporal_only = [c for c in stat_temporal if "slope_" in c or "pctchg_" in c or "roc_" in c or "ewma_" in c]  # noqa: E501
+    raw_sensors = [c for c in all_numeric if _is_raw(c)]
+    health_cols = [
+        c for c in all_numeric
+        if "shi" in c.lower() or "evidence_" in c.lower() or "health" in c.lower()
+    ]
+
+    engineered = [c for c in all_numeric if c not in raw_sensors and c not in health_cols]
+    stat_only = [
+        c for c in engineered
+        if "_rmean_" in c or "_rstd_" in c or "zscore" in c
+        or "_rmin_" in c or "_rmax_" in c or "_rrange_" in c
+    ]
+    temporal_only = [
+        c for c in engineered
+        if "_slope_" in c or "_pctchg_" in c or "_roc_" in c
+        or "_ewma_" in c or "_cv_" in c or "_skew" in c or "_kurt" in c
+    ]
 
     cols = list(raw_sensors)
     if statistical:
@@ -90,6 +112,24 @@ def _select_features(
         cols.extend(health_cols)
 
     return sorted(set(cols))
+
+
+def _engineer_features(df: pd.DataFrame, cfg) -> pd.DataFrame:
+    """Add statistical feature library + SHI health columns for ablation."""
+    sensor_cols = [c for c in SENSOR_COLS if c in df.columns]
+    out, _spec = compute_features(df, cfg, sensor_cols=sensor_cols)
+    try:
+        hi = compute_shi(
+            out, sensor_cols=sensor_cols,
+            baseline_cycles=cfg.stats.baseline_cycles,
+        )
+        shi_df = hi.shi_values[["unit_id", "cycle", "shi"]].rename(columns={"shi": "shi_score"})
+        out = out.merge(shi_df, on=["unit_id", "cycle"], how="left")
+        out["shi_score"] = out["shi_score"].ffill().bfill().fillna(50.0)
+    except Exception as exc:  # pragma: no cover - health is optional for ablation
+        print(f"    SHI skipped: {exc}")
+        out["shi_score"] = 50.0
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -116,7 +156,10 @@ def _oof_per_unit_mae(
 
         m = copy.deepcopy(model)
         try:
-            m.fit(X_tr[feature_cols + ["unit_id", "cycle"]], y_tr)
+            fit_cols = feature_cols + ["unit_id", "cycle"]
+            if "RUL" in X_tr.columns:
+                fit_cols = fit_cols + ["RUL"]
+            m.fit(X_tr[fit_cols], y_tr)
             rul_pred = m.predict_rul(X_val[feature_cols + ["unit_id", "cycle"]])
         except Exception:
             continue
@@ -139,6 +182,8 @@ def _oof_per_unit_mae(
 
 def run_e4(cfg, df, out_dir) -> dict[str, Any]:
     """Run ablation study with significance testing."""
+    print("  Engineering statistical features + SHI...")
+    df = _engineer_features(df, cfg)
     splits = make_group_kfold_splits(df, n_splits=cfg.split.n_splits, seed=cfg.seed)
     label_cols = [label_col_for(h) for h in FAILURE_HORIZONS]
     y = df[label_cols].copy()

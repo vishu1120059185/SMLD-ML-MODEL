@@ -42,6 +42,17 @@ def _comparison_from_experiments() -> dict | None:
 
     Returns ``None`` when neither experiment result exists — never invents
     Cox/RSF/LSTM/C-index numbers.
+
+    e2 schema (list)::
+
+        {"models": [{"model": "XGBoostModel",
+                     "classification": [{"horizon": 10, "roc_auc": ...}, ...],
+                     "rul": {"mae": ...}}, ...]}
+
+    e5 schema::
+
+        {"calibration": {"per_horizon": {"h10": {"brier": ..., "ece_equal_width": ...}}},
+         "conformal": {"coverage": ..., "mean_width": ...}}
     """
     e2 = _read_json(_RESULTS / "e2_model_comparison" / "e2_results.json")
     e5 = _read_json(_RESULTS / "e5_uncertainty" / "e5_results.json")
@@ -51,35 +62,52 @@ def _comparison_from_experiments() -> dict | None:
     models: list[str] = []
     metrics: dict[str, list[float]] = {"AUC": [], "Brier": [], "ECE": [], "MAE": []}
 
-    if e2:
-        for key, row in sorted((e2.get("models") or {}).items()):
-            if not isinstance(row, dict):
-                continue
-            label = key.replace("_", " ").upper()
-            models.append(label)
-            metrics["AUC"].append(float(row.get("auc_mean", np.nan)))
-            mae = row.get("mae_mean")
-            metrics["MAE"].append(float(mae) if mae is not None else np.nan)
-            metrics["Brier"].append(np.nan)
-            metrics["ECE"].append(np.nan)
+    # Mean Brier / ECE across horizons from e5 (one number per model slot)
+    e5_mean_brier = np.nan
+    e5_mean_ece = np.nan
+    if isinstance(e5, dict):
+        cal = e5.get("calibration") or {}
+        if isinstance(cal, dict):
+            mb = cal.get("mean_brier")
+            me = cal.get("mean_ece_ew")
+            if mb is not None:
+                e5_mean_brier = float(mb)
+            if me is not None:
+                e5_mean_ece = float(me)
 
-        if e5:
-            horizon_map = {
-                "h10": "XGB H10",
-                "h20": "XGB H20",
-                "h30": "XGB H30",
-                "h40": "XGB H40",
-                "h50": "XGB H50",
-            }
-            for hk, label in horizon_map.items():
-                if label not in models:
+    if isinstance(e2, dict):
+        raw_models = e2.get("models") or []
+        # Older schema: dict keyed by short name
+        if isinstance(raw_models, dict):
+            raw_models = [
+                {"model": key, **(row if isinstance(row, dict) else {})}
+                for key, row in sorted(raw_models.items())
+            ]
+        if isinstance(raw_models, list):
+            for row in raw_models:
+                if not isinstance(row, dict):
                     continue
-                idx = models.index(label)
-                h = e5.get(hk) or {}
-                if "brier" in h:
-                    metrics["Brier"][idx] = float(h["brier"])
-                if "ece" in h:
-                    metrics["ECE"][idx] = float(h["ece"])
+                name = str(row.get("model") or row.get("name") or "")
+                if not name:
+                    continue
+                label = name.replace("Model", "").replace("_", " ").upper()
+                if not label:
+                    label = name.upper()
+                models.append(label)
+
+                cls = row.get("classification") or []
+                aucs = [
+                    float(c["roc_auc"])
+                    for c in cls
+                    if isinstance(c, dict) and c.get("roc_auc") is not None
+                ]
+                metrics["AUC"].append(float(np.mean(aucs)) if aucs else np.nan)
+
+                rul = row.get("rul") or {}
+                mae = rul.get("mae") if isinstance(rul, dict) else None
+                metrics["MAE"].append(float(mae) if mae is not None else np.nan)
+                metrics["Brier"].append(e5_mean_brier)
+                metrics["ECE"].append(e5_mean_ece)
 
     # Drop all-NaN metric rows so charts only show real numbers
     metrics = {
@@ -92,23 +120,38 @@ def _comparison_from_experiments() -> dict | None:
         "source": "e2_model_comparison + e5_uncertainty",
     }
 
-    if e5 and isinstance(e5.get("conformal"), dict):
+    if isinstance(e5, dict) and isinstance(e5.get("conformal"), dict):
         conf = e5["conformal"]
-        coverage = float(conf.get("coverage", 0.0))
-        width = float(conf.get("mean_width", 0.0))
+        coverage = float(conf.get("coverage", 0.0) or 0.0)
+        width = float(conf.get("mean_width", 0.0) or 0.0)
         payload["intervals"] = {
             "coverage_90": coverage,
             "coverage_80": min(1.0, coverage - 0.1),
             "avg_width": width,
-            "sharpness": float(conf.get("sharpness", np.nan))
-            if "sharpness" in conf
+            "sharpness": float(conf["sharpness"])
+            if conf.get("sharpness") is not None
+            and not (isinstance(conf.get("sharpness"), float) and np.isnan(conf["sharpness"]))
             else None,
         }
 
     # Prefer curated model_comparison.json when present (still must be real)
     curated = _load("model_comparison.json")
-    if curated and curated.get("models") and curated.get("metrics"):
-        return curated
+    if (
+        isinstance(curated, dict)
+        and curated.get("models")
+        and curated.get("metrics")
+        and not isinstance(curated.get("models"), list)
+        or (
+            isinstance(curated, dict)
+            and isinstance(curated.get("models"), list)
+            and curated.get("metrics")
+        )
+    ):
+        # Accept both list-of-names and dict key styles as long as metrics exist
+        if isinstance(curated.get("models"), dict):
+            return curated
+        if isinstance(curated.get("models"), list) and curated.get("metrics"):
+            return curated
 
     return payload if models else None
 

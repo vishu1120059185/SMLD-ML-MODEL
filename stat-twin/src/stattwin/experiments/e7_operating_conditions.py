@@ -87,6 +87,7 @@ def _per_condition_normalize(
     for regime, stats in regime_stats.items():
         mask = out["regime"] == regime
         for col, (mean, std) in stats.items():
+            out[col] = out[col].astype(float)
             out.loc[mask, col] = (out.loc[mask, col] - mean) / std
 
     return out

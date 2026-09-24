@@ -1,9 +1,9 @@
 {
-  "unit_id": 1,
+  "unit_id": 69,
   "machine": "MACHINE-001",
-  "shi": 0.5847655085035196,
-  "shi_raw_0_100": 41.52344914964804,
+  "shi": 0.5818896732364207,
+  "shi_raw_0_100": 41.811032676357925,
   "state": "DEGRADING",
-  "cycle": 153,
+  "cycle": 289,
   "provenance": "OBSERVED"
 }

@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-09-22T04:56:43.840533+00:00",
-  "git_hash": "f15b73c",
+  "timestamp": "2026-09-24T06:36:50.845681+00:00",
+  "git_hash": "d4f136d",
   "git_dirty": true,
   "config_file": "C:\\Users\\AIML-DL-18\\Desktop\\AIML - 99\\SMLD ML MODEL\\stat-twin\\configs\\base.yaml",
   "config_hash": "439e9e7b699d",
@@ -18,7 +18,6 @@
     "torch": "2.14.0+cpu",
     "streamlit": "1.64.0",
     "pydantic": "2.11.7",
-    "pydantic_yaml": "not-installed",
     "typer": "0.27.2",
     "plotly": "7.1.0",
     "shap": "0.52.0",
@@ -155,6 +154,15 @@
       "valid_window": 100,
       "far_budget": 0.05
     }
+  },
+  "elapsed_seconds": 62.562662100000125,
+  "quality_metrics": {
+    "monotonicity_mean": 1.0,
+    "monotonicity_std": 0.0,
+    "trendability": 1.0,
+    "prognosability": 2.3088782378398554,
+    "spearman_rho_mean": 0.8152324778179224,
+    "spearman_rho_std": 0.055484957816853045
   },
   "experiment": "e1_health_index"
 }

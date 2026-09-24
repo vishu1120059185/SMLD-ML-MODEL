@@ -63,42 +63,77 @@ def _compute_trend(
     window: int = 10,
     sigma_min: float = 1e-6,
 ) -> np.ndarray:
+    """Rolling OLS slope (vectorised via cumulative sums)."""
     n = len(values)
     result = np.zeros(n, dtype=np.float64)
     std = max(baseline_std, sigma_min)
-    for i in range(n):
-        start = max(0, i - window + 1)
-        w = values[start:i + 1]
+    if n < 3:
+        return result
+
+    # Warm-up partial windows (length < 3): zeros for i < 2 already;
+    # for i in [2, window-2] compute directly (short loop).
+    warm_end = min(n, window - 1)
+    for i in range(2, warm_end):
+        w = values[: i + 1]
         if len(w) < 3:
-            result[i] = 0.0
             continue
         x = np.arange(len(w), dtype=np.float64)
-        slope = np.polyfit(x, w, 1)[0]
+        x_m = x.mean()
+        y_m = w.mean()
+        den = ((x - x_m) ** 2).sum()
+        if den == 0:
+            continue
+        slope = ((x - x_m) * (w - y_m)).sum() / den
         result[i] = max(deg_sign * slope * 10.0 / std, 0.0)
+
+    # Full windows via cumulative sums
+    if n >= window:
+        idx = np.arange(n, dtype=np.float64)
+        csum_y = np.concatenate(([0.0], np.cumsum(values)))
+        csum_ty = np.concatenate(([0.0], np.cumsum(idx * values)))
+        ends = np.arange(window, n + 1, dtype=np.int64)
+        starts = ends - window
+        sum_y = csum_y[ends] - csum_y[starts]
+        sum_ty = csum_ty[ends] - csum_ty[starts]
+        sum_xy = sum_ty - starts.astype(np.float64) * sum_y
+        x = np.arange(window, dtype=np.float64)
+        sum_x = x.sum()
+        sum_x2 = (x * x).sum()
+        m = float(window)
+        slope = (m * sum_xy - sum_x * sum_y) / (m * sum_x2 - sum_x * sum_x)
+        result[window - 1 :] = np.maximum(deg_sign * slope * 10.0 / std, 0.0)
+
     return result
 
 
 def _compute_ewma(values: np.ndarray, alpha: float = 0.2) -> np.ndarray:
-    result = np.empty_like(values, dtype=np.float64)
-    result[0] = values[0]
-    for i in range(1, len(values)):
-        result[i] = alpha * values[i] + (1 - alpha) * result[i - 1]
-    return result
+    """Causal EWMA (adjust=False) via pandas for speed."""
+    if len(values) == 0:
+        return values.astype(np.float64, copy=True)
+    return (
+        pd.Series(values)
+        .ewm(alpha=alpha, adjust=False, min_periods=1)
+        .mean()
+        .to_numpy(dtype=np.float64)
+    )
 
 
 def _compute_variance(
     values: np.ndarray,
     window: int = 10,
 ) -> np.ndarray:
+    """log(rolling std) with expanding warm-up (vectorised)."""
     n = len(values)
-    result = np.zeros(n, dtype=np.float64)
-    for i in range(n):
-        start = max(0, i - window + 1)
-        w = values[start:i + 1]
-        if len(w) < 2:
-            result[i] = 0.0
-            continue
-        result[i] = np.log(max(np.std(w), 1e-10))
+    if n < 2:
+        return np.zeros(n, dtype=np.float64)
+    s = pd.Series(values)
+    # min_periods=2: expanding for early points, fixed window once full
+    rstd = s.rolling(window, min_periods=2).std(ddof=1).to_numpy(dtype=np.float64)
+    result = np.where(
+        np.isnan(rstd),
+        0.0,
+        np.log(np.maximum(np.nan_to_num(rstd, nan=1e-10), 1e-10)),
+    )
     return result
 
 
@@ -109,17 +144,21 @@ def _compute_corr_shift(
 ) -> np.ndarray:
     n = len(values)
     result = np.zeros(n, dtype=np.float64)
-    bl_mean = np.mean(baseline_values) if len(baseline_values) > 0 else 0.0
-    bl_std = max(np.std(baseline_values), 1e-10) if len(baseline_values) > 1 else 1.0
+    if n == 0 or len(baseline_values) < 2:
+        return result
+    bl_mean = np.mean(baseline_values)
+    bl_std = max(np.std(baseline_values), 1e-10)
+    bl_norm = (baseline_values - bl_mean) / bl_std
+
     for i in range(n):
         start = max(0, i - window + 1)
-        w = values[start:i + 1]
+        w = values[start : i + 1]
         if len(w) < 3:
             result[i] = 0.0
             continue
-        bl_norm = (baseline_values - bl_mean) / bl_std
         w_norm = (w - np.mean(w)) / max(np.std(w), 1e-10)
-        rho, _ = sp_stats.spearmanr(bl_norm[:len(w)], w_norm)
+        # Preserve original semantics: compare first len(w) baseline points
+        rho, _ = sp_stats.spearmanr(bl_norm[: len(w)], w_norm)
         result[i] = abs(rho) if not np.isnan(rho) else 0.0
     return result
 

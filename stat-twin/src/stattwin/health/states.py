@@ -21,6 +21,7 @@ Two threshold variants are supported:
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Literal
@@ -237,12 +238,15 @@ class StateClassifier:
         out["health_state"] = np.nan
         out["health_state_name"] = ""
 
-        grp = out.sort_values([self.unit_col, self.cycle_col]).groupby(self.unit_col)
+        sorted_df = out.sort_values([self.unit_col, self.cycle_col])
+        pieces: list[pd.DataFrame] = []
 
-        def _classify_unit(group: pd.DataFrame) -> pd.DataFrame:
-            """Apply persistence-based state classification for one unit."""
+        for uid, group in sorted_df.groupby(self.unit_col, sort=False):
+            group = group.copy()
             n = len(group)
-            shi_vals = group[shi_col].values
+            shi_vals = group[shi_col].to_numpy(dtype=float)
+            if n == 0:
+                continue
             states = np.empty(n, dtype=np.int8)
             state_names = [""] * n
 
@@ -279,15 +283,17 @@ class StateClassifier:
                 states[i] = current_state
                 state_names[i] = current_state.name
 
-            group = group.copy()
+            group[self.unit_col] = uid
             group["health_state"] = states
             group["health_state_name"] = state_names
-            return group
+            pieces.append(group)
 
-        result = grp.apply(_classify_unit, include_groups=False)
-        # Restore original index if needed
-        if isinstance(result.index, pd.MultiIndex):
-            result = result.reset_index(level=0, drop=True)
+        if not pieces:
+            return out
+        result = pd.concat(pieces, ignore_index=False)
+        # Restore original row order where possible
+        with contextlib.suppress(KeyError):
+            result = result.loc[out.index]
         return result
 
 

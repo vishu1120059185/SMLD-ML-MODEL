@@ -20,7 +20,6 @@ from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
-from scipy import stats as sp_stats
 
 __all__ = [
     "DistributionShift",
@@ -31,6 +30,33 @@ __all__ = [
 
 _UNIT_COL = "unit_id"
 _CYCLE_COL = "cycle"
+
+
+def _ks_two_sample(a: np.ndarray, b: np.ndarray) -> float:
+    """Two-sample KS statistic (fast pure-NumPy path for small samples)."""
+    a = np.sort(a)
+    b = np.sort(b)
+    all_vals = np.concatenate([a, b])
+    cdf_a = np.searchsorted(a, all_vals, side="right") / a.size
+    cdf_b = np.searchsorted(b, all_vals, side="right") / b.size
+    return float(np.max(np.abs(cdf_a - cdf_b)))
+
+
+def _wasserstein_1d(a: np.ndarray, b: np.ndarray) -> float:
+    """1-D Wasserstein-1 distance via sorted quantile alignment."""
+    a = np.sort(a)
+    b = np.sort(b)
+    # Weighted quantile difference on the merged grid (equal weights).
+    all_vals = np.concatenate([a, b])
+    all_vals.sort()
+    # CDF step positions
+    cdf_a = np.searchsorted(a, all_vals, side="right") / a.size
+    cdf_b = np.searchsorted(b, all_vals, side="right") / b.size
+    # Integrate |F_a - F_b| over sorted support (right-Riemann on intervals)
+    if all_vals.size < 2:
+        return 0.0
+    deltas = np.diff(all_vals)
+    return float(np.sum(np.abs(cdf_a[:-1] - cdf_b[:-1]) * deltas))
 
 
 # ------------------------------------------------------------------
@@ -80,20 +106,25 @@ def ks_statistic(
         n = len(vals)
         result = np.full(n, np.nan, dtype=np.float64)
 
+        # After baseline is fixed (i >= baseline_cycles), reuse sorted baseline.
+        bl_fixed: np.ndarray | None = None
+        if n > baseline_cycles:
+            bl_fixed = np.sort(vals[:baseline_cycles])
+
         for i in range(n):
             end = i + 1
-            # Baseline: first baseline_cycles values
-            bl_end = min(baseline_cycles, end)
-            baseline = vals[:bl_end]
-            # Current window
+            if bl_fixed is not None and i >= baseline_cycles:
+                baseline = bl_fixed
+            else:
+                bl_end = min(baseline_cycles, end)
+                baseline = vals[:bl_end]
             win_start = max(0, i - window + 1)
             current = vals[win_start:end]
 
             if len(baseline) < 2 or len(current) < 2:
                 continue
 
-            ks_stat, _ = sp_stats.ks_2samp(baseline, current)
-            result[i] = ks_stat
+            result[i] = _ks_two_sample(baseline, current)
 
         return pd.Series(result, index=s.index)
 
@@ -143,17 +174,24 @@ def wasserstein_distance(
         n = len(vals)
         result = np.full(n, np.nan, dtype=np.float64)
 
+        bl_fixed: np.ndarray | None = None
+        if n > baseline_cycles:
+            bl_fixed = np.sort(vals[:baseline_cycles])
+
         for i in range(n):
             end = i + 1
-            bl_end = min(baseline_cycles, end)
-            baseline = vals[:bl_end]
+            if bl_fixed is not None and i >= baseline_cycles:
+                baseline = bl_fixed
+            else:
+                bl_end = min(baseline_cycles, end)
+                baseline = vals[:bl_end]
             win_start = max(0, i - window + 1)
             current = vals[win_start:end]
 
             if len(baseline) < 2 or len(current) < 2:
                 continue
 
-            result[i] = sp_stats.wasserstein_distance(baseline, current)
+            result[i] = _wasserstein_1d(baseline, current)
 
         return pd.Series(result, index=s.index)
 
@@ -211,44 +249,70 @@ def population_stability_index(
         n = len(vals)
         result = np.full(n, np.nan, dtype=np.float64)
 
+        # Cache fixed baseline stats once baseline period is complete.
+        bl_fixed: np.ndarray | None = None
+        edges_fixed: np.ndarray | None = None
+        bl_counts_fixed: np.ndarray | None = None
+        n_bins_fixed = 0
+        if n > baseline_cycles:
+            bl_fixed = vals[:baseline_cycles]
+            try:
+                edges_fixed = np.unique(
+                    np.quantile(bl_fixed, np.linspace(0, 1, n_bins + 1))
+                )
+                if edges_fixed.size >= 2:
+                    n_bins_fixed = len(edges_fixed) - 1
+                    bl_dig = np.digitize(bl_fixed, edges_fixed[1:-1], right=True)
+                    bl_counts_fixed = np.bincount(
+                        bl_dig, minlength=n_bins_fixed
+                    ).astype(np.float64)
+                else:
+                    edges_fixed = None
+            except Exception:
+                edges_fixed = None
+
         for i in range(n):
             end = i + 1
-            bl_end = min(baseline_cycles, end)
-            baseline = vals[:bl_end]
             win_start = max(0, i - window + 1)
             current = vals[win_start:end]
 
-            if len(baseline) < n_bins or len(current) < 2:
+            if bl_fixed is not None and i >= baseline_cycles and edges_fixed is not None:
+                baseline = bl_fixed
+                bin_edges = edges_fixed
+                bl_counts = bl_counts_fixed
+                n_bins_actual = n_bins_fixed
+            else:
+                bl_end = min(baseline_cycles, end)
+                baseline = vals[:bl_end]
+                if len(baseline) < n_bins or len(current) < 2:
+                    continue
+                try:
+                    bin_edges = np.unique(
+                        np.quantile(baseline, np.linspace(0, 1, n_bins + 1))
+                    )
+                except Exception:
+                    continue
+                if bin_edges.size < 2:
+                    continue
+                n_bins_actual = len(bin_edges) - 1
+                bl_dig = np.digitize(baseline, bin_edges[1:-1], right=True)
+                bl_counts = np.bincount(
+                    bl_dig, minlength=n_bins_actual
+                ).astype(np.float64)
+
+            if len(current) < 2:
                 continue
 
-            # Quantile-based bins from baseline
-            try:
-                bin_edges = np.quantile(
-                    baseline, np.linspace(0, 1, n_bins + 1)
-                )
-            except Exception:
-                continue
-
-            # Ensure unique edges
-            bin_edges = np.unique(bin_edges)
-            if len(bin_edges) < 2:
-                continue
-
-            # Digitise both distributions
-            bl_dig = np.digitize(baseline, bin_edges[1:-1], right=True)
             cur_dig = np.digitize(current, bin_edges[1:-1], right=True)
+            cur_counts = np.bincount(
+                cur_dig, minlength=n_bins_actual
+            ).astype(np.float64)
 
-            n_bins_actual = len(bin_edges) - 1
-            bl_counts = np.bincount(bl_dig, minlength=n_bins_actual).astype(np.float64)
-            cur_counts = np.bincount(cur_dig, minlength=n_bins_actual).astype(np.float64)
-
-            # Proportions with Laplace smoothing to avoid log(0)
             eps = 1e-6
             bl_prop = (bl_counts + eps) / (bl_counts.sum() + eps * n_bins_actual)
             cur_prop = (cur_counts + eps) / (cur_counts.sum() + eps * n_bins_actual)
 
-            psi = float(np.sum((cur_prop - bl_prop) * np.log(cur_prop / bl_prop)))
-            result[i] = psi
+            result[i] = float(np.sum((cur_prop - bl_prop) * np.log(cur_prop / bl_prop)))
 
         return pd.Series(result, index=s.index)
 

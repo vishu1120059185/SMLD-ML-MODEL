@@ -1,31 +1,81 @@
 {
-  "fault_types": [
-    "spike",
-    "stuck",
-    "dropout",
-    "noise"
-  ],
-  "dq_detection": {
+  "dataset": "FD001",
+  "fault_injection": {
     "spike": {
-      "precision": 0.92,
-      "recall": 0.88
+      "true_positives": 295,
+      "false_positives": 4778,
+      "false_negatives": 5,
+      "precision": 0.058150995466193574,
+      "recall": 0.9833333333333333,
+      "f1": 0.10980830076307464,
+      "n_faults": 300,
+      "n_normals": 5000,
+      "dq_flag_columns": [
+        "dq_badge",
+        "sensor_1_dq_flag",
+        "sensor_2_dq_flag",
+        "sensor_3_dq_flag",
+        "sensor_4_dq_flag",
+        "sensor_5_dq_flag",
+        "sensor_6_dq_flag",
+        "sensor_7_dq_flag",
+        "sensor_8_dq_flag",
+        "sensor_9_dq_flag",
+        "sensor_10_dq_flag",
+        "sensor_11_dq_flag",
+        "sensor_12_dq_flag",
+        "sensor_13_dq_flag",
+        "sensor_14_dq_flag",
+        "sensor_15_dq_flag",
+        "sensor_16_dq_flag",
+        "sensor_17_dq_flag",
+        "sensor_18_dq_flag",
+        "sensor_19_dq_flag",
+        "sensor_20_dq_flag",
+        "sensor_21_dq_flag"
+      ]
     },
     "stuck": {
-      "precision": 0.95,
-      "recall": 0.91
+      "true_positives": 192,
+      "false_positives": 2863,
+      "false_negatives": 8,
+      "precision": 0.06284779050736497,
+      "recall": 0.96,
+      "f1": 0.11797235023041473,
+      "n_faults": 200,
+      "n_normals": 3000,
+      "dq_flag_columns": [
+        "dq_badge",
+        "sensor_1_dq_flag",
+        "sensor_2_dq_flag",
+        "sensor_3_dq_flag",
+        "sensor_4_dq_flag",
+        "sensor_5_dq_flag",
+        "sensor_6_dq_flag",
+        "sensor_7_dq_flag",
+        "sensor_8_dq_flag",
+        "sensor_9_dq_flag",
+        "sensor_10_dq_flag",
+        "sensor_11_dq_flag",
+        "sensor_12_dq_flag",
+        "sensor_13_dq_flag",
+        "sensor_14_dq_flag",
+        "sensor_15_dq_flag",
+        "sensor_16_dq_flag",
+        "sensor_17_dq_flag",
+        "sensor_18_dq_flag",
+        "sensor_19_dq_flag",
+        "sensor_20_dq_flag",
+        "sensor_21_dq_flag"
+      ]
     },
-    "dropout": {
-      "precision": 0.97,
-      "recall": 0.94
-    },
-    "noise": {
-      "precision": 0.78,
-      "recall": 0.72
+    "summary": {
+      "spike_precision": 0.058150995466193574,
+      "spike_recall": 0.9833333333333333,
+      "spike_f1": 0.10980830076307464,
+      "stuck_precision": 0.06284779050736497,
+      "stuck_recall": 0.96,
+      "stuck_f1": 0.11797235023041473
     }
-  },
-  "false_alarm_reduction": {
-    "without_gating": 0.15,
-    "with_gating": 0.04,
-    "reduction_pct": 73.3
   }
 }

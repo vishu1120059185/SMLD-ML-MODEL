@@ -244,7 +244,7 @@ def run_e3(cfg, df, out_dir) -> dict[str, Any]:
 
     all_results = []
     for model in models:
-        print(f"  Early warning: {model.name} (H={horizon}, FAR≤{far_budget})...")
+        print(f"  Early warning: {model.name} (H={horizon}, FAR<={far_budget})...")
         with Timer() as t:
             result = _run_early_warning_for_model(
                 model, df, y, splits, feature_cols, horizon, far_budget,

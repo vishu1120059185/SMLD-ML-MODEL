@@ -1,21 +1,922 @@
 {
-  "shi_range": [
-    14.300386510738129,
-    70.93901282761081
-  ],
+  "dataset": "FD001",
   "quality_metrics": {
-    "monotonicity_mean": "1.0",
-    "monotonicity_std": "0.0",
-    "trendability": "1.0",
-    "prognosability": "2.311285224737085",
-    "spearman_rho_mean": "0.8251653265070407",
-    "spearman_rho_std": "0.053425951960183876"
+    "monotonicity_mean": 1.0,
+    "monotonicity_std": 0.0,
+    "trendability": 1.0,
+    "prognosability": 2.3088782378398554,
+    "spearman_rho_mean": 0.8152324778179224,
+    "spearman_rho_std": 0.055484957816853045
   },
-  "state_distribution": {
-    "2": 16171,
-    "1": 4373,
-    "3": 83,
-    "0": 4
+  "per_unit_monotonicity": [
+    {
+      "unit_id": 1,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 2,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 3,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 4,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 5,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 6,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 7,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 8,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 9,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 10,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 11,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 12,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 13,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 14,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 15,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 16,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 17,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 18,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 19,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 20,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 21,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 22,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 23,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 24,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 25,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 26,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 27,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 28,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 29,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 30,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 31,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 32,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 33,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 34,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 35,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 36,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 37,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 38,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 39,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 40,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 41,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 42,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 43,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 44,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 45,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 46,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 47,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 48,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 49,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 50,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 51,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 52,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 53,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 54,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 55,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 56,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 57,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 58,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 59,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 60,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 61,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 62,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 63,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 64,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 65,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 66,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 67,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 68,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 69,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 70,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 71,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 72,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 73,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 74,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 75,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 76,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 77,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 78,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 79,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 80,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 81,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 82,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 83,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 84,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 85,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 86,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 87,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 88,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 89,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 90,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 91,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 92,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 93,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 94,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 95,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 96,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 97,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 98,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 99,
+      "monotonicity": 1.0
+    },
+    {
+      "unit_id": 100,
+      "monotonicity": 1.0
+    }
+  ],
+  "weight_sensitivity": {
+    "deviation": [
+      {
+        "weight": 0.05,
+        "weights": {
+          "deviation": 0.0625,
+          "trend": 0.3125,
+          "ewma": 0.25,
+          "variance": 0.18749999999999997,
+          "corr_shift": 0.18749999999999997
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 0.9917171717171717,
+        "prognosability": 1.5054775628612096,
+        "spearman_rho_mean": 0.6914260795062234
+      },
+      {
+        "weight": 0.1,
+        "weights": {
+          "deviation": 0.11764705882352942,
+          "trend": 0.29411764705882354,
+          "ewma": 0.23529411764705885,
+          "variance": 0.17647058823529413,
+          "corr_shift": 0.17647058823529413
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 0.9995959595959596,
+        "prognosability": 1.7450491786523121,
+        "spearman_rho_mean": 0.739364861168351
+      },
+      {
+        "weight": 0.2,
+        "weights": {
+          "deviation": 0.2105263157894737,
+          "trend": 0.2631578947368421,
+          "ewma": 0.2105263157894737,
+          "variance": 0.15789473684210525,
+          "corr_shift": 0.15789473684210525
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.1452377030835974,
+        "spearman_rho_mean": 0.7969629339881926
+      },
+      {
+        "weight": 0.3,
+        "weights": {
+          "deviation": 0.2857142857142857,
+          "trend": 0.23809523809523808,
+          "ewma": 0.19047619047619047,
+          "variance": 0.14285714285714285,
+          "corr_shift": 0.14285714285714285
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.451314507279357,
+        "spearman_rho_mean": 0.8295672890049803
+      },
+      {
+        "weight": 0.4,
+        "weights": {
+          "deviation": 0.3478260869565218,
+          "trend": 0.2173913043478261,
+          "ewma": 0.1739130434782609,
+          "variance": 0.13043478260869565,
+          "corr_shift": 0.13043478260869565
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.68263439658449,
+        "spearman_rho_mean": 0.8502522231764503
+      },
+      {
+        "weight": 0.5,
+        "weights": {
+          "deviation": 0.4,
+          "trend": 0.2,
+          "ewma": 0.16,
+          "variance": 0.12,
+          "corr_shift": 0.12
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.8577055199009465,
+        "spearman_rho_mean": 0.8642578415646399
+      }
+    ],
+    "trend": [
+      {
+        "weight": 0.05,
+        "weights": {
+          "deviation": 0.3125,
+          "trend": 0.0625,
+          "ewma": 0.25,
+          "variance": 0.18749999999999997,
+          "corr_shift": 0.18749999999999997
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.3728893268224254,
+        "spearman_rho_mean": 0.8288391560768804
+      },
+      {
+        "weight": 0.1,
+        "weights": {
+          "deviation": 0.29411764705882354,
+          "trend": 0.11764705882352942,
+          "ewma": 0.23529411764705885,
+          "variance": 0.17647058823529413,
+          "corr_shift": 0.17647058823529413
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.377279998350659,
+        "spearman_rho_mean": 0.826904597739189
+      },
+      {
+        "weight": 0.2,
+        "weights": {
+          "deviation": 0.2631578947368421,
+          "trend": 0.2105263157894737,
+          "ewma": 0.2105263157894737,
+          "variance": 0.15789473684210525,
+          "corr_shift": 0.15789473684210525
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.3420976896029564,
+        "spearman_rho_mean": 0.8198352813113294
+      },
+      {
+        "weight": 0.3,
+        "weights": {
+          "deviation": 0.23809523809523808,
+          "trend": 0.2857142857142857,
+          "ewma": 0.19047619047619047,
+          "variance": 0.14285714285714285,
+          "corr_shift": 0.14285714285714285
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.2690835191559557,
+        "spearman_rho_mean": 0.8103723572216136
+      },
+      {
+        "weight": 0.4,
+        "weights": {
+          "deviation": 0.2173913043478261,
+          "trend": 0.3478260869565218,
+          "ewma": 0.1739130434782609,
+          "variance": 0.13043478260869565,
+          "corr_shift": 0.13043478260869565
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.17874906677006,
+        "spearman_rho_mean": 0.799691546181579
+      },
+      {
+        "weight": 0.5,
+        "weights": {
+          "deviation": 0.2,
+          "trend": 0.4,
+          "ewma": 0.16,
+          "variance": 0.12,
+          "corr_shift": 0.12
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.0845505432050464,
+        "spearman_rho_mean": 0.7883185643203072
+      }
+    ],
+    "ewma": [
+      {
+        "weight": 0.05,
+        "weights": {
+          "deviation": 0.29411764705882354,
+          "trend": 0.29411764705882354,
+          "ewma": 0.05882352941176471,
+          "variance": 0.17647058823529413,
+          "corr_shift": 0.17647058823529413
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.144681986243423,
+        "spearman_rho_mean": 0.7828965601311815
+      },
+      {
+        "weight": 0.1,
+        "weights": {
+          "deviation": 0.2777777777777778,
+          "trend": 0.2777777777777778,
+          "ewma": 0.11111111111111112,
+          "variance": 0.16666666666666666,
+          "corr_shift": 0.16666666666666666
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.2067230388896544,
+        "spearman_rho_mean": 0.7949880728671048
+      },
+      {
+        "weight": 0.2,
+        "weights": {
+          "deviation": 0.25,
+          "trend": 0.25,
+          "ewma": 0.2,
+          "variance": 0.15,
+          "corr_shift": 0.15
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.3088782378398554,
+        "spearman_rho_mean": 0.8152324778179224
+      },
+      {
+        "weight": 0.3,
+        "weights": {
+          "deviation": 0.22727272727272727,
+          "trend": 0.22727272727272727,
+          "ewma": 0.2727272727272727,
+          "variance": 0.13636363636363635,
+          "corr_shift": 0.13636363636363635
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.385678279880116,
+        "spearman_rho_mean": 0.8316248541618783
+      },
+      {
+        "weight": 0.4,
+        "weights": {
+          "deviation": 0.20833333333333334,
+          "trend": 0.20833333333333334,
+          "ewma": 0.33333333333333337,
+          "variance": 0.125,
+          "corr_shift": 0.125
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.4418935755594546,
+        "spearman_rho_mean": 0.8447580930201493
+      },
+      {
+        "weight": 0.5,
+        "weights": {
+          "deviation": 0.1923076923076923,
+          "trend": 0.1923076923076923,
+          "ewma": 0.3846153846153846,
+          "variance": 0.11538461538461538,
+          "corr_shift": 0.11538461538461538
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.4819058932244156,
+        "spearman_rho_mean": 0.8554370060012197
+      }
+    ],
+    "variance": [
+      {
+        "weight": 0.05,
+        "weights": {
+          "deviation": 0.2777777777777778,
+          "trend": 0.2777777777777778,
+          "ewma": 0.22222222222222224,
+          "variance": 0.05555555555555556,
+          "corr_shift": 0.16666666666666666
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.5677535529215882,
+        "spearman_rho_mean": 0.8452822706922838
+      },
+      {
+        "weight": 0.1,
+        "weights": {
+          "deviation": 0.2631578947368421,
+          "trend": 0.2631578947368421,
+          "ewma": 0.2105263157894737,
+          "variance": 0.10526315789473685,
+          "corr_shift": 0.15789473684210525
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.437401949690288,
+        "spearman_rho_mean": 0.830637251971249
+      },
+      {
+        "weight": 0.2,
+        "weights": {
+          "deviation": 0.23809523809523808,
+          "trend": 0.23809523809523808,
+          "ewma": 0.19047619047619047,
+          "variance": 0.19047619047619047,
+          "corr_shift": 0.14285714285714285
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.1865324999645903,
+        "spearman_rho_mean": 0.7996538094147562
+      },
+      {
+        "weight": 0.3,
+        "weights": {
+          "deviation": 0.2173913043478261,
+          "trend": 0.2173913043478261,
+          "ewma": 0.1739130434782609,
+          "variance": 0.2608695652173913,
+          "corr_shift": 0.13043478260869565
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 1.967801708182743,
+        "spearman_rho_mean": 0.7683281001251089
+      },
+      {
+        "weight": 0.4,
+        "weights": {
+          "deviation": 0.2,
+          "trend": 0.2,
+          "ewma": 0.16,
+          "variance": 0.32,
+          "corr_shift": 0.12
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 0.9995959595959596,
+        "prognosability": 1.785309697202487,
+        "spearman_rho_mean": 0.7378159112156688
+      },
+      {
+        "weight": 0.5,
+        "weights": {
+          "deviation": 0.18518518518518517,
+          "trend": 0.18518518518518517,
+          "ewma": 0.14814814814814814,
+          "variance": 0.37037037037037035,
+          "corr_shift": 0.1111111111111111
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 0.9967676767676767,
+        "prognosability": 1.6348367223252813,
+        "spearman_rho_mean": 0.7081145011783052
+      }
+    ],
+    "corr_shift": [
+      {
+        "weight": 0.05,
+        "weights": {
+          "deviation": 0.2777777777777778,
+          "trend": 0.2777777777777778,
+          "ewma": 0.22222222222222224,
+          "variance": 0.16666666666666666,
+          "corr_shift": 0.05555555555555556
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.5677535529215874,
+        "spearman_rho_mean": 0.8452822706922838
+      },
+      {
+        "weight": 0.1,
+        "weights": {
+          "deviation": 0.2631578947368421,
+          "trend": 0.2631578947368421,
+          "ewma": 0.2105263157894737,
+          "variance": 0.15789473684210525,
+          "corr_shift": 0.10526315789473685
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.437401949690289,
+        "spearman_rho_mean": 0.830637251971249
+      },
+      {
+        "weight": 0.2,
+        "weights": {
+          "deviation": 0.23809523809523808,
+          "trend": 0.23809523809523808,
+          "ewma": 0.19047619047619047,
+          "variance": 0.14285714285714285,
+          "corr_shift": 0.19047619047619047
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 2.1865324999645903,
+        "spearman_rho_mean": 0.7996538094147562
+      },
+      {
+        "weight": 0.3,
+        "weights": {
+          "deviation": 0.2173913043478261,
+          "trend": 0.2173913043478261,
+          "ewma": 0.1739130434782609,
+          "variance": 0.13043478260869565,
+          "corr_shift": 0.2608695652173913
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 1.0,
+        "prognosability": 1.9678017081827437,
+        "spearman_rho_mean": 0.7683281001251089
+      },
+      {
+        "weight": 0.4,
+        "weights": {
+          "deviation": 0.2,
+          "trend": 0.2,
+          "ewma": 0.16,
+          "variance": 0.12,
+          "corr_shift": 0.32
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 0.9995959595959596,
+        "prognosability": 1.785309697202487,
+        "spearman_rho_mean": 0.7378159112156688
+      },
+      {
+        "weight": 0.5,
+        "weights": {
+          "deviation": 0.18518518518518517,
+          "trend": 0.18518518518518517,
+          "ewma": 0.14814814814814814,
+          "variance": 0.1111111111111111,
+          "corr_shift": 0.37037037037037035
+        },
+        "monotonicity_mean": 1.0,
+        "trendability": 0.9967676767676767,
+        "prognosability": 1.6348367223252807,
+        "spearman_rho_mean": 0.7081145011783052
+      }
+    ]
   },
-  "elapsed_seconds": 23.41
+  "threshold_sensitivity": [
+    {
+      "thresholds": [
+        80.0,
+        60.0,
+        40.0
+      ],
+      "avg_late_critical_fraction": 0.8664937586741805,
+      "avg_early_healthy_fraction": 0.009140747487150344
+    },
+    {
+      "thresholds": [
+        75.0,
+        50.0,
+        25.0
+      ],
+      "avg_late_critical_fraction": 0.017829094108161116,
+      "avg_early_healthy_fraction": 0.6656661792467442
+    },
+    {
+      "thresholds": [
+        85.0,
+        65.0,
+        45.0
+      ],
+      "avg_late_critical_fraction": 0.9928721361839697,
+      "avg_early_healthy_fraction": 0.0
+    },
+    {
+      "thresholds": [
+        70.0,
+        45.0,
+        20.0
+      ],
+      "avg_late_critical_fraction": 0.0009906332878539346,
+      "avg_early_healthy_fraction": 0.9563926859320803
+    },
+    {
+      "thresholds": [
+        90.0,
+        70.0,
+        50.0
+      ],
+      "avg_late_critical_fraction": 1.0,
+      "avg_early_healthy_fraction": 0.0
+    }
+  ],
+  "shi_weights_used": {
+    "deviation": 0.25,
+    "trend": 0.25,
+    "ewma": 0.2,
+    "variance": 0.15,
+    "corr_shift": 0.15
+  },
+  "sensor_weights_used": {
+    "sensor_1": 0.0,
+    "sensor_2": 0.06580874810030335,
+    "sensor_3": 0.06263905843277448,
+    "sensor_4": 0.07705520087840612,
+    "sensor_5": 0.0,
+    "sensor_6": 0.013880831609738008,
+    "sensor_7": 0.07482052245750534,
+    "sensor_8": 0.06717414642329264,
+    "sensor_9": 0.06593288782729781,
+    "sensor_10": 0.0,
+    "sensor_11": 0.08059528887765897,
+    "sensor_12": 0.07804348870238018,
+    "sensor_13": 0.06763937065359524,
+    "sensor_14": 0.06992975317819457,
+    "sensor_15": 0.07076061667490251,
+    "sensor_16": 0.0,
+    "sensor_17": 0.06587953846149835,
+    "sensor_18": 0.0,
+    "sensor_19": 0.0,
+    "sensor_20": 0.0699796219264907,
+    "sensor_21": 0.0698609257959619
+  }
 }

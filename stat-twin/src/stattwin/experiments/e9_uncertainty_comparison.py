@@ -117,30 +117,41 @@ def _quantile_regression(
 
 
 def _bootstrap_pi(
-    model_class, X_train: pd.DataFrame, y_train: np.ndarray,
+    model_template, X_train: pd.DataFrame, y_train: pd.DataFrame,
     X_test: pd.DataFrame,
     feature_cols: list[str],
     n_bootstraps: int = 50,
     alpha: float = 0.10,
     seed: int = 42,
 ) -> dict[str, Any]:
-    """Bootstrap prediction intervals via resampled model fits."""
+    """Bootstrap prediction intervals via resampled model fits.
+
+    ``model_template`` may be a fitted model instance (deep-copied) or a
+    model class (instantiated with default horizons).
+    """
+    from stattwin.data.schema import FAILURE_HORIZONS as _HZ
+
     rng = np.random.default_rng(seed)
     test_preds = []
+    n = len(X_train)
+    fit_cols = feature_cols + ["unit_id", "cycle"]
+    if "RUL" in X_train.columns:
+        fit_cols = fit_cols + ["RUL"]
 
     for _b in range(n_bootstraps):
-        # Resample training data
-        idx = rng.integers(0, len(X_train), size=len(X_train))
-        X_boot = X_train.iloc[idx].copy()
-        y_boot = y_train[idx]
+        # Row bootstrap: resample X and multi-horizon y together
+        idx = rng.integers(0, n, size=n)
+        X_boot = X_train.iloc[idx].reset_index(drop=True)
+        y_boot = y_train.iloc[idx].reset_index(drop=True)
 
-        m = copy.deepcopy(model_class)
+        if isinstance(model_template, type):
+            m = model_template(horizons=list(_HZ))
+        else:
+            m = copy.deepcopy(model_template)
         try:
-            m.fit(X_boot[feature_cols + ["unit_id", "cycle"]], pd.DataFrame(
-                {label_col_for(h): (y_boot <= h).astype(int) for h in FAILURE_HORIZONS}
-            ))
+            m.fit(X_boot[fit_cols], y_boot)
             pred = m.predict_rul(X_test[feature_cols + ["unit_id", "cycle"]])
-            test_preds.append(pred.values)
+            test_preds.append(np.asarray(pred, dtype=float))
         except Exception:
             continue
 
@@ -198,10 +209,13 @@ def _compare_uncertainty_methods(
         label_cols = [label_col_for(h) for h in FAILURE_HORIZONS]
         y_fit = X_fit[label_cols].reindex(columns=label_cols, fill_value=0)
 
-        # Fit model
+        # Fit model (include RUL so tree models train a real RUL regressor)
+        fit_cols = available + ["unit_id", "cycle"]
+        if "RUL" in X_fit.columns:
+            fit_cols = fit_cols + ["RUL"]
         m = copy.deepcopy(model)
         try:
-            m.fit(X_fit[available + ["unit_id", "cycle"]], y_fit)
+            m.fit(X_fit[fit_cols], y_fit)
         except Exception:
             continue
 
@@ -242,14 +256,16 @@ def _compare_uncertainty_methods(
 
         # 4. Bootstrap PI
         boot = _bootstrap_pi(
-            XGBoostModel, X_fit, y_fit[label_col_for(30)].values,
-            X_val, available, n_bootstraps=30, alpha=alpha, seed=42,
+            model, X_fit, y_fit,
+            X_val, available, n_bootstraps=15, alpha=alpha, seed=42,
         )
         if "error" not in boot:
             im_boot = interval_metrics(rul_val_true, np.array(boot["lower"]), np.array(boot["upper"]), alpha)  # noqa: E501
             method_results["bootstrap"].append({
                 "picp": im_boot.picp, "mean_width": im_boot.mean_width, "winkler": im_boot.winkler,
             })
+        else:
+            print(f"    bootstrap fold {fold_idx}: {boot['error']}")
 
     # Aggregate
     summary = {}

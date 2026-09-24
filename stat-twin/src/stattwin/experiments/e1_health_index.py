@@ -27,7 +27,7 @@ from stattwin.data.loader import load_cmapss
 from stattwin.health.quality import (
     compute_quality_metrics,
 )
-from stattwin.health.shi import EvidenceComponent, compute_shi
+from stattwin.health.shi import compute_shi
 from stattwin.health.states import classify_states
 
 from ._common import (
@@ -52,14 +52,51 @@ _DEFAULT_WEIGHTS: dict[str, float] = {
 }
 
 
+def _aggregate_shi_from_evidence(
+    evidence_dfs: dict[str, pd.DataFrame],
+    weights: dict[str, float],
+) -> pd.DataFrame:
+    """Re-aggregate SHI from precomputed per-component evidence series.
+
+    Evidence components (after sensor weighting / ECDF) do not depend on
+    evidence-component weights — only the final convex combination does.
+    This makes the weight sweep O(components) instead of a full SHI recompute.
+    """
+    frames = []
+    for name, ev_df in evidence_dfs.items():
+        col = f"evidence_{name}"
+        if col in ev_df.columns:
+            frames.append(
+                ev_df[["unit_id", "cycle", col]].rename(columns={col: name})
+            )
+    if not frames:
+        raise ValueError("No evidence components available for aggregation")
+
+    merged = frames[0]
+    for f in frames[1:]:
+        merged = merged.merge(f, on=["unit_id", "cycle"], how="outer")
+
+    total_w = sum(weights.get(name, 0.0) for name in weights if name in merged.columns)
+    if total_w <= 0:
+        total_w = 1.0
+
+    shi = np.zeros(len(merged), dtype=np.float64)
+    for name, w in weights.items():
+        if name in merged.columns:
+            shi += (w / total_w) * merged[name].to_numpy(dtype=np.float64)
+
+    out = merged[["unit_id", "cycle"]].copy()
+    out["shi"] = np.clip(100.0 * (1.0 - shi), 0.0, 100.0)
+    return out
+
+
 def _sweep_weight(
-    df: pd.DataFrame,
-    sensor_cols: list[str],
+    evidence_dfs: dict[str, pd.DataFrame],
     component_name: str,
     weight_values: list[float],
-    baseline_cycles: int = 30,
+    rul_df: pd.DataFrame,
 ) -> list[dict[str, Any]]:
-    """Sweep one component's weight and compute quality metrics."""
+    """Sweep one component's weight over cached evidence (no SHI recompute)."""
     results = []
     for w in weight_values:
         weights = dict(_DEFAULT_WEIGHTS)
@@ -68,15 +105,8 @@ def _sweep_weight(
         total = sum(weights.values())
         weights = {k: v / total for k, v in weights.items()}
 
-        components = [EvidenceComponent(name=k, weight=v) for k, v in weights.items()]
-        hi = compute_shi(
-            df, sensor_cols=sensor_cols,
-            evidence_components=components,
-            baseline_cycles=baseline_cycles,
-        )
-        shi_df = hi.shi_values
-
-        quality = compute_quality_metrics(shi_df, rul_df=df)
+        shi_df = _aggregate_shi_from_evidence(evidence_dfs, weights)
+        quality = compute_quality_metrics(shi_df, rul_df=rul_df)
         results.append({
             "weight": w,
             "weights": weights,
@@ -204,11 +234,14 @@ def run_e1(cfg, df, out_dir) -> dict[str, Any]:
     # 2. Quality metrics
     quality = compute_quality_metrics(shi_df, rul_df=df)
 
-    # 3. Weight sensitivity (sweep each component)
+    # 3. Weight sensitivity (sweep each component using cached evidence)
     weight_sweep: dict[str, list] = {}
     for comp in _DEFAULT_WEIGHTS:
-        sweep = _sweep_weight(df, sensor_cols, comp, [0.05, 0.1, 0.2, 0.3, 0.4, 0.5],
-                              baseline_cycles=cfg.stats.baseline_cycles)
+        sweep = _sweep_weight(
+            hi.evidence_components, comp,
+            [0.05, 0.1, 0.2, 0.3, 0.4, 0.5],
+            rul_df=df,
+        )
         weight_sweep[comp] = sweep
 
     # 4. Threshold sensitivity
@@ -266,7 +299,7 @@ def main() -> None:
     print(f"     Monotonicity:  {qm.get('monotonicity_mean', 'N/A'):.4f}")
     print(f"     Trendability:  {qm.get('trendability', 'N/A'):.4f}")
     print(f"     Prognosability:{qm.get('prognosability', 'N/A'):.4f}")
-    print(f"     Spearman ρ:    {qm.get('spearman_rho_mean', 'N/A'):.4f}")
+    print(f"     Spearman rho:  {qm.get('spearman_rho_mean', 'N/A'):.4f}")
     print(f"     Output: {out_dir}")
 
     from ._common import save_manifest

@@ -1,0 +1,121 @@
+{
+  "dataset": "FD001",
+  "horizon": 30,
+  "far_budget": 0.05,
+  "models": [
+    {
+      "model": "LogisticModel",
+      "horizon": 30,
+      "far_budget": 0.05,
+      "n_folds": 3,
+      "mean_lead_time": 20.692307692307693,
+      "median_lead_time": 18.0,
+      "min_lead_time": 0.0,
+      "max_lead_time": 59.0,
+      "std_lead_time": 15.462367626701745,
+      "n_warned": 49,
+      "n_failed": 49,
+      "mean_far": 0.0,
+      "per_fold": [
+        {
+          "fold": 0,
+          "tau": 0.05,
+          "far": 0.0,
+          "n_warned": 17,
+          "mean_lead_time": 28.0
+        },
+        {
+          "fold": 1,
+          "tau": 0.05,
+          "far": 0.0,
+          "n_warned": 16,
+          "mean_lead_time": 11.444444444444445
+        },
+        {
+          "fold": 2,
+          "tau": 0.05,
+          "far": 0.0,
+          "n_warned": 16,
+          "mean_lead_time": 19.5
+        }
+      ],
+      "elapsed_seconds": 0.7086934999999812
+    },
+    {
+      "model": "RandomForestModel",
+      "horizon": 30,
+      "far_budget": 0.05,
+      "n_folds": 3,
+      "mean_lead_time": 15.527777777777779,
+      "median_lead_time": 12.0,
+      "min_lead_time": 0.0,
+      "max_lead_time": 49.0,
+      "std_lead_time": 12.623800517521373,
+      "n_warned": 49,
+      "n_failed": 49,
+      "mean_far": 0.0,
+      "per_fold": [
+        {
+          "fold": 0,
+          "tau": 0.05,
+          "far": 0.0,
+          "n_warned": 17,
+          "mean_lead_time": 24.23076923076923
+        },
+        {
+          "fold": 1,
+          "tau": 0.05,
+          "far": 0.0,
+          "n_warned": 16,
+          "mean_lead_time": 10.222222222222221
+        },
+        {
+          "fold": 2,
+          "tau": 0.05,
+          "far": 0.0,
+          "n_warned": 16,
+          "mean_lead_time": 10.857142857142858
+        }
+      ],
+      "elapsed_seconds": 13.692117800000005
+    },
+    {
+      "model": "XGBoostModel",
+      "horizon": 30,
+      "far_budget": 0.05,
+      "n_folds": 3,
+      "mean_lead_time": 9.555555555555555,
+      "median_lead_time": 5.0,
+      "min_lead_time": 0.0,
+      "max_lead_time": 25.0,
+      "std_lead_time": 9.238940669327736,
+      "n_warned": 49,
+      "n_failed": 49,
+      "mean_far": 0.0,
+      "per_fold": [
+        {
+          "fold": 0,
+          "tau": 0.05,
+          "far": 0.0,
+          "n_warned": 17,
+          "mean_lead_time": 19.22222222222222
+        },
+        {
+          "fold": 1,
+          "tau": 0.05,
+          "far": 0.0,
+          "n_warned": 16,
+          "mean_lead_time": 4.166666666666667
+        },
+        {
+          "fold": 2,
+          "tau": 0.05,
+          "far": 0.0,
+          "n_warned": 16,
+          "mean_lead_time": 5.0
+        }
+      ],
+      "elapsed_seconds": 42.29325490000008
+    }
+  ]
+}

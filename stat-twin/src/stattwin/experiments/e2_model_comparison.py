@@ -96,7 +96,10 @@ def _evaluate_single_model(
 
         m = copy.deepcopy(model)
         try:
-            m.fit(X_tr[feature_cols + ["unit_id", "cycle"]], y_tr)
+            fit_cols = feature_cols + ["unit_id", "cycle"]
+            if "RUL" in X_tr.columns:
+                fit_cols = fit_cols + ["RUL"]
+            m.fit(X_tr[fit_cols], y_tr)
             proba = m.predict_proba(X_val[feature_cols + ["unit_id", "cycle"]])
             rul_pred = m.predict_rul(X_val[feature_cols + ["unit_id", "cycle"]])
             raw = m.score_raw(X_val[feature_cols + ["unit_id", "cycle"]])

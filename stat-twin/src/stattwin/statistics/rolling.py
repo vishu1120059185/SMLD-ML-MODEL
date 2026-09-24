@@ -279,20 +279,42 @@ def z_score_vs_baseline(
     grp = _causal_groupby(out, unit_col)
 
     def _zscore_causal(s: pd.Series) -> pd.Series:
-        """Vectorised causal z-score within one unit group."""
-        n = len(s)
-        result = np.full(n, np.nan, dtype=np.float64)
-
+        """Causal z-score: expanding warm-up, then fixed healthy baseline."""
         vals = s.values.astype(np.float64)
-        for i in range(n):
-            # Use expanding baseline up to baseline_cycles, then fixed window
-            end = i + 1
-            baseline_slice = vals[:end] if end <= baseline_cycles else vals[:baseline_cycles]
-            mu = np.nanmean(baseline_slice)
-            sigma = np.nanstd(baseline_slice, ddof=1) if len(baseline_slice) > 1 else 1.0
+        n = len(vals)
+        result = np.full(n, np.nan, dtype=np.float64)
+        k = min(baseline_cycles, n)
+
+        # Warm-up: expanding mean/std over vals[:i+1] for i < baseline_cycles
+        if k > 0:
+            exp_mean = np.empty(k, dtype=np.float64)
+            exp_std = np.empty(k, dtype=np.float64)
+            # running sum / M2 for expanding mean & sample std
+            mean = 0.0
+            m2 = 0.0
+            for i in range(k):
+                x = vals[i]
+                delta = x - mean
+                mean += delta / (i + 1)
+                m2 += delta * (x - mean)
+                exp_mean[i] = mean
+                exp_std[i] = np.sqrt(m2 / i) if i >= 1 else 1.0
+            for i in range(k):
+                mu = exp_mean[i]
+                sigma = exp_std[i]
+                if sigma == 0 or np.isnan(sigma):
+                    sigma = 1.0
+                result[i] = (vals[i] - mu) / sigma
+
+        # Fixed baseline after warm-up (vectorised)
+        if n > k:
+            baseline = vals[:k] if k > 0 else vals[:1]
+            mu = float(np.nanmean(baseline)) if k > 0 else 0.0
+            sigma = float(np.nanstd(baseline, ddof=1)) if k > 1 else 1.0
             if sigma == 0 or np.isnan(sigma):
                 sigma = 1.0
-            result[i] = (vals[i] - mu) / sigma
+            result[k:] = (vals[k:] - mu) / sigma
+
         return pd.Series(result, index=s.index)
 
     out[f"{column}_zscore"] = grp[column].transform(_zscore_causal)
@@ -426,20 +448,16 @@ def rolling_slope(
             vals = s.values.astype(np.float64)
             n = len(vals)
             result = np.full(n, np.nan, dtype=np.float64)
-            x = np.arange(win, dtype=np.float64)
-            x_mean = x.mean()
-            x_var = ((x - x_mean) ** 2).sum()
-            if x_var == 0:
+            if n < 2:
                 return pd.Series(result, index=s.index)
 
-            for i in range(n):
-                start = max(0, i - win + 1)
-                end = i + 1
-                y_win = vals[start:end]
+            # Warm-up partial windows (length < win): small loop (at most win-1 rows)
+            warm = min(n, win - 1)
+            for i in range(warm):
+                y_win = vals[: i + 1]
                 actual_len = len(y_win)
                 if actual_len < 2:
                     continue
-                # Center x for numerical stability
                 x_use = np.arange(actual_len, dtype=np.float64)
                 x_m = x_use.mean()
                 y_m = np.nanmean(y_win)
@@ -448,11 +466,43 @@ def rolling_slope(
                 if den == 0:
                     continue
                 slope_per_cycle = num / den
-                # Normalize by rolling std
-                roll_std = np.nanstd(y_win, ddof=1) if actual_len > 1 else 1.0
+                roll_std = np.nanstd(y_win, ddof=1)
                 if roll_std == 0 or np.isnan(roll_std):
                     roll_std = 1.0
                 result[i] = (slope_per_cycle / roll_std) * sp
+
+            # Full windows: closed-form via cumulative sums (vectorised)
+            if n >= win:
+                idx = np.arange(n, dtype=np.float64)
+                csum_y = np.concatenate(([0.0], np.cumsum(vals)))
+                csum_ty = np.concatenate(([0.0], np.cumsum(idx * vals)))
+                csum_y2 = np.concatenate(([0.0], np.cumsum(vals * vals)))
+
+                ends = np.arange(win, n + 1, dtype=np.int64)  # exclusive end indices
+                starts = ends - win
+                sum_y = csum_y[ends] - csum_y[starts]
+                sum_ty = csum_ty[ends] - csum_ty[starts]
+                sum_y2 = csum_y2[ends] - csum_y2[starts]
+                # Window positions 0..win-1 relative to start
+                start_vals = starts.astype(np.float64)
+                sum_xy = sum_ty - start_vals * sum_y
+
+                x = np.arange(win, dtype=np.float64)
+                sum_x = x.sum()
+                sum_x2 = (x * x).sum()
+                m = float(win)
+                num = m * sum_xy - sum_x * sum_y
+                den = m * sum_x2 - sum_x * sum_x
+                slope_per_cycle = num / den
+
+                # rolling std (ddof=1)
+                mean_y = sum_y / m
+                var = (sum_y2 - m * mean_y * mean_y) / (m - 1.0)
+                roll_std = np.sqrt(np.maximum(var, 0.0))
+                roll_std = np.where((roll_std == 0) | np.isnan(roll_std), 1.0, roll_std)
+
+                result[win - 1 :] = (slope_per_cycle / roll_std) * sp
+
             return pd.Series(result, index=s.index)
 
         out[f"{column}_slope_{w}"] = grp[column].transform(_slope_w)
