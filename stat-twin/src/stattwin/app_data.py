@@ -21,6 +21,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from stattwin.config import STATTWINConfig
 from stattwin.data.loader import load_cmapss
 from stattwin.experiments._common import (
     _PROJECT_ROOT,
@@ -99,7 +100,9 @@ def build_artifacts(
             "into data/raw/CMAPSS/."
         )
 
-    df = load_cmapss(raw_path, add_labels=True)
+    df = load_cmapss(
+        raw_path, add_labels=True, rul_clip=STATTWINConfig().dataset.rul_clip
+    )
     if unit_id is None:
         # Prefer a mid-life unit so the timeline shows degradation
         unit_lengths = df.groupby("unit_id")["cycle"].max()

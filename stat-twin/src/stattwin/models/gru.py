@@ -180,7 +180,8 @@ def _build_sequences(
     X_seq: (n_samples, seq_len, n_features)
     y_labels: (n_samples, n_horizons)
     y_rul: (n_samples,)
-    row_idx: (n_samples,) – original DataFrame row indices
+    row_idx: (n_samples,) – original DataFrame row indices **in sequence
+        order** (callers must reindex predictions with these labels)
     mask: (n_samples, seq_len) – 1 for real, 0 for padded
     """
     all_units = df[unit_col].unique()
@@ -231,7 +232,7 @@ def _build_sequences(
             if "RUL" in row_labels.index:
                 rul_list.append(float(row_labels["RUL"]))
             else:
-                rul_list.append(60.0)
+                rul_list.append(np.nan)
 
             mask_list.append(mask)
 
@@ -274,8 +275,22 @@ class GRUModel(BaseModel):
         Early-stopping patience (default 8).
     horizon_weight:
         Loss weight for horizon BCE vs RUL MSE (default 1.0).
+    normalize_features:
+        If *True* (default), standardise inputs per feature using
+        statistics fitted on the training frames only.
+    rul_scale:
+        Divisor applied to RUL targets so the MSE term has the same
+        numeric order as BCE.  *None* (default) uses the training max.
+    val_fraction:
+        Fraction of training **units** held out for early stopping
+        (default 0.15).  0 disables the inner split (falls back to
+        train-loss early stopping).
+    raw_only:
+        If *True*, restrict features to exact ``sensor_N`` /
+        ``op_setting_N`` columns (useful when engineered columns are
+        present in the frame).  Default *False*.
     device:
-``"cpu"`` or ``"cuda"`` (default auto-detect).
+        ``"cpu"`` or ``"cuda"`` (default auto-detect).
     horizons:
         Failure horizons (must be 5 for default multi-head).
     """
@@ -287,11 +302,16 @@ class GRUModel(BaseModel):
         layers: int = 2,
         dropout: float = 0.2,
         seq_len: int = 30,
-        lr: float = 1e-3,
-        batch_size: int = 64,
-        epochs: int = 50,
-        patience: int = 8,
-        horizon_weight: float = 1.0,
+    lr: float = 1e-3,
+    batch_size: int = 64,
+    epochs: int = 50,
+    patience: int = 8,
+    weight_decay: float = 1e-5,
+    horizon_weight: float = 1.0,
+        normalize_features: bool = True,
+        rul_scale: float | None = None,
+        val_fraction: float = 0.15,
+        raw_only: bool = False,
         device: str | None = None,
         horizons: Sequence[int] | None = None,
     ) -> None:
@@ -305,7 +325,12 @@ class GRUModel(BaseModel):
         self.batch_size = batch_size
         self.epochs = epochs
         self.patience = patience
+        self.weight_decay = weight_decay
         self.horizon_weight = horizon_weight
+        self.normalize_features = normalize_features
+        self.rul_scale_cfg = rul_scale
+        self.val_fraction = val_fraction
+        self.raw_only = raw_only
 
         if device is None:
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -315,18 +340,39 @@ class GRUModel(BaseModel):
         self._net: _GRUNetwork | _LSTMNetwork | None = None
         self._sensor_cols: list[str] = []
         self._input_size: int = 0
+        self._feat_mean: np.ndarray | None = None
+        self._feat_std: np.ndarray | None = None
+        self._rul_scale: float = 1.0
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
     def _select_features(self, X: pd.DataFrame) -> list[str]:
-        """Return raw sensor columns only."""
-        return [
+        """Return numeric feature columns (raw only when ``raw_only``)."""
+        def _is_raw(name: str) -> bool:
+            if name.startswith("sensor_"):
+                return name[7:].isdigit()
+            if name.startswith("op_setting_"):
+                return name[11:].isdigit()
+            return False
+
+        cols = [
             c for c in X.columns
             if c not in {_UNIT_COL, _CYCLE_COL, "RUL"}
             and pd.api.types.is_numeric_dtype(X[c])
         ]
+        if self.raw_only:
+            raw = [c for c in cols if _is_raw(c)]
+            return raw or cols
+        return cols
+
+    def _normalise_seq(self, seq: np.ndarray) -> np.ndarray:
+        if not self.normalize_features or self._feat_mean is None:
+            return seq
+        mean = self._feat_mean[None, None, :]
+        std = self._feat_std[None, None, :]
+        return (seq - mean) / std
 
     def _create_network(self, input_size: int) -> _GRUNetwork | _LSTMNetwork:
         if self.backbone == "lstm":
@@ -378,15 +424,16 @@ class GRUModel(BaseModel):
 
         return total_loss / max(n_batches, 1)
 
-    @torch.no_grad()
     def _evaluate(
         self,
         loader: DataLoader,
         net: nn.Module,
         bce_loss: nn.Module,
         mse_loss: nn.Module,
+        horizon_weight: float | None = None,
     ) -> tuple[float, float, float]:
         """Evaluate, return (total_loss, bce_loss, mse_loss)."""
+        hw = self.horizon_weight if horizon_weight is None else horizon_weight
         net.eval()
         total = 0.0
         bce_total = 0.0
@@ -400,7 +447,7 @@ class GRUModel(BaseModel):
             horizon_logits, rul_pred = net(X_batch)
             l_h = bce_loss(horizon_logits, y_batch).item()
             l_r = mse_loss(rul_pred, rul_batch).item()
-            total += l_h + l_r
+            total += hw * l_h + l_r
             bce_total += l_h
             mse_total += l_r
             n += 1
@@ -426,7 +473,8 @@ class GRUModel(BaseModel):
         y_train:
             Binary label DataFrame (aligned with X_train).
         groups:
-            Ignored.
+            Optional unit ids used for the inner early-stopping split.
+            If *None*, units are derived from ``X_train["unit_id"]``.
         """
         self._sensor_cols = self._select_features(X_train)
         self._input_size = len(self._sensor_cols)
@@ -437,24 +485,83 @@ class GRUModel(BaseModel):
             if col not in df.columns and col in y_train.columns:
                 df[col] = y_train[col].values
 
-        X_seq, y_labels, y_rul, row_idx, mask = _build_sequences(
+        # --- RUL target scale -------------------------------------------
+        if "RUL" in df.columns:
+            rul_vals_all = df["RUL"].to_numpy(dtype=np.float64)
+            self._rul_scale = (
+                float(self.rul_scale_cfg)
+                if self.rul_scale_cfg is not None
+                else max(float(np.nanmax(rul_vals_all)), 1.0)
+            )
+        else:
+            self._rul_scale = 1.0
+            print(
+                "[GRUModel] WARNING: RUL column missing from fit frame – "
+                "RUL head will train on placeholder targets.",
+                flush=True,
+            )
+
+        X_seq, y_labels, y_rul, row_idx, _mask = _build_sequences(
             df, self._sensor_cols, self.seq_len
         )
+
+        # --- feature normalisation (fit on train rows only) --------------
+        if self.normalize_features:
+            flat = X_seq.reshape(-1, X_seq.shape[-1])
+            self._feat_mean = flat.mean(axis=0)
+            self._feat_std = np.where(flat.std(axis=0) < 1e-8, 1.0, flat.std(axis=0))
+            X_seq = self._normalise_seq(X_seq)
+        else:
+            self._feat_mean = None
+            self._feat_std = None
+
+        # Replace NaN RUL with the training mean so MSE stays finite
+        if np.isnan(y_rul).any():
+            fill = np.nanmean(y_rul) if not np.all(np.isnan(y_rul)) else 60.0
+            y_rul = np.where(np.isnan(y_rul), fill, y_rul)
+        y_rul_scaled = y_rul / self._rul_scale
+
+        # --- inner unit-disjoint validation split ------------------------
+        units = np.array(sorted(df[_UNIT_COL].unique()))
+        n_val_units = 0
+        if self.val_fraction > 0 and len(units) >= 4:
+            n_val_units = max(1, int(round(self.val_fraction * len(units))))
+        rng = np.random.default_rng(42)
+        perm = rng.permutation(len(units))
+        val_units = set(units[perm[:n_val_units]].tolist()) if n_val_units else set()
+
+        # row_idx holds original df labels; map them to sequence positions
+        unit_of_row = df[_UNIT_COL].reindex(row_idx).to_numpy()
+        if val_units:
+            is_val = np.isin(unit_of_row, list(val_units))
+        else:
+            is_val = np.zeros(len(row_idx), dtype=bool)
+
+        seq_train, lab_train, rul_train = X_seq[~is_val], y_labels[~is_val], y_rul_scaled[~is_val]
+        seq_val, lab_val, rul_val = X_seq[is_val], y_labels[is_val], y_rul_scaled[is_val]
 
         # Create network
         self._net = self._create_network(self._input_size).to(self.device)
 
-        # Data loader
-        dataset = _SequenceDataset(X_seq, y_labels, y_rul)
-        loader = DataLoader(
-            dataset, batch_size=self.batch_size, shuffle=True, drop_last=False
+        train_ds = _SequenceDataset(seq_train, lab_train, rul_train)
+        train_loader = DataLoader(
+            train_ds, batch_size=self.batch_size, shuffle=True, drop_last=False
         )
+        if len(seq_val) > 0:
+            val_ds = _SequenceDataset(seq_val, lab_val, rul_val)
+            val_loader = DataLoader(
+                val_ds, batch_size=self.batch_size, shuffle=False, drop_last=False
+            )
+        else:
+            val_loader = train_ds and DataLoader(
+                train_ds, batch_size=self.batch_size, shuffle=False
+            )
 
-        # Losses with class weighting
+        # Losses with class weighting (computed on inner-train only)
         pos_weights = []
-        for i in range(y_labels.shape[1]):
-            n_pos = y_labels[:, i].sum()
-            n_neg = len(y_labels) - n_pos
+        for i in range(lab_train.shape[1]):
+            n_pos = lab_train[:, i].sum()
+            n_neg = len(lab_train) - n_pos
             pw = n_neg / max(n_pos, 1.0)
             pos_weights.append(min(pw, 50.0))  # cap extreme weights
         pos_weight = torch.tensor(pos_weights, dtype=torch.float32, device=self.device)
@@ -462,19 +569,25 @@ class GRUModel(BaseModel):
         bce_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         mse_loss = nn.MSELoss()
 
-        optimizer = torch.optim.Adam(self._net.parameters(), lr=self.lr, weight_decay=1e-5)
+        optimizer = torch.optim.Adam(
+            self._net.parameters(), lr=self.lr, weight_decay=self.weight_decay
+        )
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode="min", factor=0.5, patience=3
         )
 
-        # Training loop with early stopping
+        # Training loop with early stopping on held-out units
         best_loss = float("inf")
         best_state = None
         patience_counter = 0
 
         for _epoch in range(self.epochs):
-            _train_loss = self._train_epoch(loader, self._net, optimizer, bce_loss, mse_loss)
-            val_loss, _, _ = self._evaluate(loader, self._net, bce_loss, mse_loss)
+            _train_loss = self._train_epoch(
+                train_loader, self._net, optimizer, bce_loss, mse_loss
+            )
+            val_loss, _, _ = self._evaluate(
+                val_loader, self._net, bce_loss, mse_loss
+            )
             scheduler.step(val_loss)
 
             if val_loss < best_loss:
@@ -493,13 +606,14 @@ class GRUModel(BaseModel):
         self.is_fitted = True
         return self
 
-    def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Predict per-horizon failure probabilities."""
+    def _predict_arrays(
+        self, X: pd.DataFrame
+    ) -> tuple[pd.DataFrame, pd.Series]:
+        """Run the network once; return (proba_df, rul_series) aligned to X."""
         if self._net is None:
             raise RuntimeError("Model not fitted.")
 
         df = X.copy()
-        # Ensure label columns exist for sequence building
         for col in self.label_cols:
             if col not in df.columns:
                 df[col] = 0
@@ -507,52 +621,48 @@ class GRUModel(BaseModel):
         X_seq, _, _, row_idx, _ = _build_sequences(
             df, self._sensor_cols, self.seq_len
         )
+        X_seq = self._normalise_seq(X_seq)
 
         self._net.eval()
-        dataset = _SequenceDataset(X_seq, np.zeros((len(X_seq), len(self.horizons))), None)
+        dataset = _SequenceDataset(
+            X_seq, np.zeros((len(X_seq), len(self.horizons))), None
+        )
         loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
 
         all_logits: list[np.ndarray] = []
-        with torch.no_grad():
-            for X_batch, _, _ in loader:
-                X_batch = X_batch.to(self.device)
-                horizon_logits, _ = self._net(X_batch)
-                all_logits.append(torch.sigmoid(horizon_logits).cpu().numpy())
-
-        proba_arr = np.concatenate(all_logits, axis=0)
-        proba_dict = {
-            label_col_for(h): proba_arr[:, i]
-            for i, h in enumerate(self.horizons)
-        }
-        return pd.DataFrame(proba_dict, index=X.index)
-
-    def predict_rul(self, X: pd.DataFrame) -> pd.Series:
-        """Predict point RUL."""
-        if self._net is None:
-            raise RuntimeError("Model not fitted.")
-
-        df = X.copy()
-        for col in self.label_cols:
-            if col not in df.columns:
-                df[col] = 0
-
-        X_seq, _, _, row_idx, _ = _build_sequences(
-            df, self._sensor_cols, self.seq_len
-        )
-
-        self._net.eval()
-        dataset = _SequenceDataset(X_seq, np.zeros((len(X_seq), len(self.horizons))), None)
-        loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
-
         all_rul: list[np.ndarray] = []
         with torch.no_grad():
             for X_batch, _, _ in loader:
                 X_batch = X_batch.to(self.device)
-                _, rul_pred = self._net(X_batch)
+                horizon_logits, rul_pred = self._net(X_batch)
+                all_logits.append(torch.sigmoid(horizon_logits).cpu().numpy())
                 all_rul.append(rul_pred.cpu().numpy())
 
-        rul_arr = np.concatenate(all_rul, axis=0)
-        return pd.Series(np.maximum(rul_arr, 0.0), index=X.index, name="RUL")
+        proba_arr = np.concatenate(all_logits, axis=0)
+        rul_arr = np.concatenate(all_rul, axis=0) * self._rul_scale
+
+        # Sequences are built in (unit, cycle) order – re-align to X.index
+        seq_index = pd.Index(row_idx, name=X.index.name)
+        proba_dict = {
+            label_col_for(h): proba_arr[:, i]
+            for i, h in enumerate(self.horizons)
+        }
+        proba = pd.DataFrame(proba_dict, index=seq_index).reindex(X.index)
+        # Rows never seen by _build_sequences (should not happen) get 0.5
+        proba = proba.fillna(0.5)
+        rul = pd.Series(rul_arr, index=seq_index).reindex(X.index)
+        rul = rul.fillna(rul.median() if rul.notna().any() else 60.0)
+        return proba, rul.clip(lower=0.0).rename("RUL")
+
+    def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Predict per-horizon failure probabilities."""
+        proba, _ = self._predict_arrays(X)
+        return proba
+
+    def predict_rul(self, X: pd.DataFrame) -> pd.Series:
+        """Predict point RUL."""
+        _, rul = self._predict_arrays(X)
+        return rul
 
     def score_raw(self, X: pd.DataFrame) -> pd.Series:
         """Return max horizon probability as the raw score."""

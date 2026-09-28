@@ -1,0 +1,8 @@
+  Comparing uncertainty methods...
+    split_conformal: PICP=0.9132, Width=164.46, Winkler=192.92
+    ensemble_variance: PICP=0.8972, Width=66.40, Winkler=90.72
+    quantile_bootstrap: PICP=0.9017, Width=71.18, Winkler=93.69
+    bootstrap: PICP=0.8693, Width=64.38, Winkler=96.40
+
+[e9] Completed in 262.0s
+     Output: C:\Users\AIML-DL-18\Desktop\AIML - 99\SMLD ML MODEL\stat-twin\results\e9_uncertainty_comparison

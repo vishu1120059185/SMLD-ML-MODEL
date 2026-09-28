@@ -116,18 +116,25 @@ def _select_features(
 
 def _engineer_features(df: pd.DataFrame, cfg) -> pd.DataFrame:
     """Add statistical feature library + SHI health columns for ablation."""
+    import time
+
     sensor_cols = [c for c in SENSOR_COLS if c in df.columns]
+    t0 = time.time()
     out, _spec = compute_features(df, cfg, sensor_cols=sensor_cols)
+    print(f"    compute_features: {time.time() - t0:.1f}s "
+          f"({out.shape[1] - df.shape[1]} new cols)", flush=True)
     try:
+        t0 = time.time()
         hi = compute_shi(
             out, sensor_cols=sensor_cols,
             baseline_cycles=cfg.stats.baseline_cycles,
         )
+        print(f"    compute_shi: {time.time() - t0:.1f}s", flush=True)
         shi_df = hi.shi_values[["unit_id", "cycle", "shi"]].rename(columns={"shi": "shi_score"})
         out = out.merge(shi_df, on=["unit_id", "cycle"], how="left")
         out["shi_score"] = out["shi_score"].ffill().bfill().fillna(50.0)
     except Exception as exc:  # pragma: no cover - health is optional for ablation
-        print(f"    SHI skipped: {exc}")
+        print(f"    SHI skipped: {exc}", flush=True)
         out["shi_score"] = 50.0
     return out
 
@@ -182,22 +189,29 @@ def _oof_per_unit_mae(
 
 def run_e4(cfg, df, out_dir) -> dict[str, Any]:
     """Run ablation study with significance testing."""
-    print("  Engineering statistical features + SHI...")
+    print("  Engineering statistical features + SHI...", flush=True)
     df = _engineer_features(df, cfg)
+    print(f"  Engineered: {df.shape[1]} columns, {len(df)} rows", flush=True)
     splits = make_group_kfold_splits(df, n_splits=cfg.split.n_splits, seed=cfg.seed)
     label_cols = [label_col_for(h) for h in FAILURE_HORIZONS]
     y = df[label_cols].copy()
 
-    base_model = XGBoostModel(horizons=FAILURE_HORIZONS)
+    xgb_cfg = cfg.model.xgb
+    base_model = XGBoostModel(
+        n_estimators=xgb_cfg.n_estimators,
+        max_depth=xgb_cfg.max_depth,
+        learning_rate=xgb_cfg.learning_rate,
+        horizons=FAILURE_HORIZONS,
+    )
 
     variant_results: dict[str, Any] = {}
     variant_unit_mae: dict[str, list[float]] = {}
 
     for variant_name, flags in ABLATION_VARIANTS.items():
         print(f"  Ablation {variant_name}: stat={flags['statistical']}, "
-              f"temp={flags['temporal']}, health={flags['health']}")
+              f"temp={flags['temporal']}, health={flags['health']}", flush=True)
         feature_cols = _select_features(df, **flags)
-        print(f"    Features: {len(feature_cols)}")
+        print(f"    Features: {len(feature_cols)}", flush=True)
 
         with Timer() as t:
             unit_mae = _oof_per_unit_mae(base_model, df, y, splits, feature_cols)
@@ -218,7 +232,8 @@ def run_e4(cfg, df, out_dir) -> dict[str, Any]:
             "elapsed_seconds": t.elapsed,
         }
         variant_unit_mae[variant_name] = all_maes
-        print(f"    Mean MAE: {variant_results[variant_name]['mean_mae']:.4f}")
+        print(f"    Mean MAE: {variant_results[variant_name]['mean_mae']:.4f} "
+              f"({t.elapsed:.1f}s)", flush=True)
 
     # Pairwise significance tests: E_full vs each other variant
     baseline_key = "E_full"
@@ -339,7 +354,7 @@ def main() -> None:
     if not raw_path.exists():
         raise FileNotFoundError(f"Raw file not found: {raw_path}")
 
-    df = load_cmapss(raw_path, add_labels=True)
+    df = load_cmapss(raw_path, add_labels=True, rul_clip=cfg.dataset.rul_clip)
     out_dir = setup_output("e4_ablation")
 
     with Timer() as t:

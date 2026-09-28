@@ -178,14 +178,18 @@ class RULReport:
 
 
 def _nasa_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    """NASA asymmetric scoring function.
+    """NASA asymmetric scoring function (Saxena et al.).
 
-    S(d) = exp(-d/13) - 1  for d < 0  (early prediction, d = ytrue - ypred)
-    S(d) = exp(d/10) - 1   for d >= 0  (late prediction)
+    Let ``d = y_pred - y_true``:
+
+    * ``d >= 0`` (late prediction) – penalised sharply: ``exp(d/10) - 1``
+    * ``d < 0``  (early prediction) – penalised softly:  ``exp(-d/13) - 1``
 
     Lower is better (0 when predictions are perfect).
     """
-    d = y_true - y_pred  # positive → late, negative → early
+    d = np.asarray(y_pred, dtype=float) - np.asarray(y_true, dtype=float)
+    # Clip to keep exp() finite for extreme unclipped-tail errors.
+    d = np.clip(d, -250.0, 250.0)
     scores = np.where(d < 0, np.exp(-d / 13.0) - 1.0, np.exp(d / 10.0) - 1.0)
     return float(np.mean(scores))
 

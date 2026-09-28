@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-09-24T06:33:33.196940+00:00",
-  "git_hash": "d4f136d",
+  "timestamp": "2026-09-24T08:06:30.934421+00:00",
+  "git_hash": "99b50d6",
   "git_dirty": true,
   "config_file": "C:\\Users\\AIML-DL-18\\Desktop\\AIML - 99\\SMLD ML MODEL\\stat-twin\\configs\\base.yaml",
   "config_hash": "439e9e7b699d",
@@ -155,6 +155,6 @@
       "far_budget": 0.05
     }
   },
-  "elapsed_seconds": 1748.1848228,
+  "elapsed_seconds": 2023.8655482000013,
   "experiment": "e4_ablation"
 }

@@ -95,10 +95,10 @@ class _TabularFallback:
                 scale_pos_weight=min(spw, 50.0),
                 random_state=self.random_state,
                 eval_metric="aucpr",
-            n_jobs=-1,
-        )
-        clf.fit(X_arr, y_arr)
-        self._classifiers[h] = clf
+                n_jobs=-1,
+            )
+            clf.fit(X_arr, y_arr)
+            self._classifiers[h] = clf
 
         if rul is not None:
             self._regressor = XGBRegressor(
@@ -138,24 +138,15 @@ class _TabularFallback:
 
 
 def _enforce_monotone(proba: pd.DataFrame, horizons: list[int]) -> pd.DataFrame:
-    """Enforce P(+10) <= P(+20) <= ... <= P(+50) per row.
+    """Enforce P(fail_h10) <= P(fail_h20) <= ... <= P(fail_h50) per row.
 
-    Uses a cumulative-maximum from right to left (highest horizon first)
-    to guarantee monotonicity.
+    Implemented as a vectorised cumulative maximum from left to right
+    (lowest horizon first), which guarantees a non-decreasing sequence
+    without collapsing rows to a constant.
     """
     cols = [label_col_for(h) for h in horizons]
-    out = proba[cols].copy().to_numpy(dtype=np.float64)
-
-    # Enforce: from highest horizon down, each must be >= the next
-    # So enforce from the right: out[:, i] = max(out[:, i], out[:, i+1])
-    for i in range(len(cols) - 2, -1, -1):
-        out[:, i] = np.maximum(out[:, i], out[:, i + 1])
-
-    # Also ensure from left to right: out[:, i] <= out[:, i+1]
-    # (cumulative min from left)
-    for i in range(1, len(cols)):
-        out[:, i] = np.maximum(out[:, i], out[:, i - 1])
-
+    out = proba[cols].to_numpy(dtype=np.float64)
+    out = np.maximum.accumulate(out, axis=1)
     return pd.DataFrame(out, columns=cols, index=proba.index)
 
 

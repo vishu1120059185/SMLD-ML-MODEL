@@ -406,7 +406,7 @@ def main() -> None:
     if not raw_path.exists():
         raise FileNotFoundError(f"Raw file not found: {raw_path}")
 
-    df = load_cmapss(raw_path, add_labels=True)
+    df = load_cmapss(raw_path, add_labels=True, rul_clip=cfg.dataset.rul_clip)
     out_dir = setup_output("e8_fault_injection")
 
     with Timer() as t:

@@ -72,7 +72,7 @@ def experiment_setup(args: argparse.Namespace) -> tuple[STATTWINConfig, pd.DataF
             f"and place '{cfg.dataset.name}.txt' in data/raw/CMAPSS/"
         )
 
-    df = load_cmapss(raw_path, add_labels=True)
+    df = load_cmapss(raw_path, add_labels=True, rul_clip=cfg.dataset.rul_clip)
 
     exp_tag = Path(__file__).stem  # overridden by caller
     return cfg, df, _PROJECT_ROOT / "results" / exp_tag

@@ -86,16 +86,33 @@ class LogisticModel(BaseModel):
         return self._scaler.transform(vals)
 
     def _compute_weighted_rul(self, proba: pd.DataFrame) -> pd.Series:
-        """Derive RUL from per-horizon probabilities via weighted inversion.
+        """Derive RUL from per-horizon probabilities with tail extrapolation.
 
-        RUL_est = sum_h  P(RUL > h) * delta_h
-        where delta_h = h_{i+1} - h_i (with h_0 = 0).
+        Trapezoidal integral of the survival function up to the last
+        horizon gives a value in ``[0, max(horizons)]``.  A constant-hazard
+        exponential tail is then appended so that units which are still
+        likely alive past ``max(horizons)`` are not capped at 50::
+
+            RUL = sum_h S(h) * delta_h  +  S(h_max) / lambda
+            lambda = -log(S(h_{k-1}) / S(h_k)) / (h_k - h_{k-1})
         """
         h_arr = np.array(self.horizons, dtype=np.float64)
         delta = np.diff(np.concatenate(([0.0], h_arr)))
         # P(RUL > h) = 1 - P(fail_h)
         p_survive = 1.0 - proba.values  # shape (n, len(horizons))
+        p_survive = np.clip(p_survive, 1e-6, 1.0)
         rul = p_survive @ delta
+
+        if len(h_arr) >= 2:
+            s_last = p_survive[:, -1]
+            s_prev = p_survive[:, -2]
+            span = h_arr[-1] - h_arr[-2]
+            # Constant-hazard estimate from the final survival segment.
+            hazard = -np.log(s_prev / s_last) / span
+            hazard = np.clip(hazard, 1e-4, 10.0)
+            tail = np.where(s_last > 0.05, s_last / hazard, 0.0)
+            rul = rul + tail
+
         return pd.Series(np.maximum(rul, 0.0), index=proba.index, name="RUL")
 
     # ------------------------------------------------------------------

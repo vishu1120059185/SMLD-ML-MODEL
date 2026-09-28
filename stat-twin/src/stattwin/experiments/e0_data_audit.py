@@ -267,7 +267,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    df = load_cmapss(raw_path, add_labels=True)
+    df = load_cmapss(raw_path, add_labels=True, rul_clip=cfg.dataset.rul_clip)
     out_dir = setup_output("e0_data_audit")
 
     with Timer() as t:

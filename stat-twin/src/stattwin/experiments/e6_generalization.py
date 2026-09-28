@@ -45,12 +45,12 @@ from ._common import (
 ALL_DATASETS = ["FD001", "FD002", "FD003", "FD004"]
 
 
-def _load_dataset(ds_name: str) -> pd.DataFrame | None:
+def _load_dataset(ds_name: str, rul_clip: int | None = None) -> pd.DataFrame | None:
     """Load a C-MAPSS dataset; return None if file missing."""
     raw_path = resolve_raw_path(ds_name)
     if not raw_path.exists():
         return None
-    return load_cmapss(raw_path, add_labels=True)
+    return load_cmapss(raw_path, add_labels=True, rul_clip=rul_clip)
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ def run_e6(cfg, out_dir) -> dict[str, Any]:
     # Load all available datasets
     datasets: dict[str, pd.DataFrame] = {}
     for ds in ALL_DATASETS:
-        df = _load_dataset(ds)
+        df = _load_dataset(ds, rul_clip=cfg.dataset.rul_clip)
         if df is not None:
             datasets[ds] = df
             print(f"  Loaded {ds}: {len(df)} rows, {df['unit_id'].nunique()} units")

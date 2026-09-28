@@ -33,6 +33,7 @@ def load_cmapss(
     *,
     horizons: list[int] | None = None,
     add_labels: bool = True,
+    rul_clip: int | None = None,
 ) -> pd.DataFrame:
     """Load a single C-MAPSS text file and return a validated ``DataFrame``.
 
@@ -46,6 +47,10 @@ def load_cmapss(
     add_labels:
         If *True* (default), compute ``RUL`` **and** binary ``y_h`` columns
         for every horizon.
+    rul_clip:
+        Optional upper bound applied to RUL (C-MAPSS convention: 125).
+        Applied **before** labels are derived, so ``fail_h`` columns are
+        computed from the clipped RUL.  *None* (default) leaves RUL raw.
 
     Returns
     -------
@@ -71,7 +76,7 @@ def load_cmapss(
     _validate_structure(df)
 
     # --- RUL computation ---------------------------------------------------
-    df = _compute_rul(df)
+    df = _compute_rul(df, rul_clip=rul_clip)
 
     # --- binary failure labels ---------------------------------------------
     if add_labels:
@@ -127,11 +132,18 @@ def _validate_structure(df: pd.DataFrame) -> None:
             )
 
 
-def _compute_rul(df: pd.DataFrame) -> pd.DataFrame:
-    """Add an ``RUL`` column (max cycle per unit − current cycle)."""
+def _compute_rul(df: pd.DataFrame, rul_clip: int | None = None) -> pd.DataFrame:
+    """Add an ``RUL`` column (max cycle per unit − current cycle).
+
+    If *rul_clip* is given the value is clipped to ``[0, rul_clip]``
+    (C-MAPSS convention uses 125).
+    """
     max_cycle = df.groupby("unit_id")["cycle"].transform("max")
     df = df.copy()
-    df["RUL"] = (max_cycle - df["cycle"]).astype(int)
+    rul = (max_cycle - df["cycle"]).astype(int)
+    if rul_clip is not None:
+        rul = rul.clip(upper=int(rul_clip))
+    df["RUL"] = rul
     return df
 
 

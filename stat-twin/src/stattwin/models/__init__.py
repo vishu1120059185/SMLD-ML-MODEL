@@ -6,6 +6,7 @@ All models implement the ``BaseModel`` interface providing ``fit``,
 
 from stattwin.models.anomaly import AnomalyModel
 from stattwin.models.base import BaseModel, ModelResult
+from stattwin.models.ensemble import EnsembleModel, build_member
 from stattwin.models.gru import GRUModel
 from stattwin.models.hybrid import HybridModel
 from stattwin.models.logistic import LogisticModel
@@ -16,6 +17,7 @@ from stattwin.models.xgboost_model import XGBoostModel
 __all__ = [
     "AnomalyModel",
     "BaseModel",
+    "EnsembleModel",
     "GRUModel",
     "HybridModel",
     "LogisticModel",
@@ -23,4 +25,5 @@ __all__ = [
     "RandomForestModel",
     "ThresholdModel",
     "XGBoostModel",
+    "build_member",
 ]

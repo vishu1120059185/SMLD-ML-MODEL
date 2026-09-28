@@ -99,6 +99,15 @@ class GRUCfg(BaseModel):
     layers: int = 2
     dropout: float = 0.2
     ensemble_size: int = 3
+    seq_len: int = 30
+    lr: float = 1e-3
+    batch_size: int = 64
+    epochs: int = 50
+    patience: int = 8
+    weight_decay: float = 1e-5
+    horizon_weight: float = 1.0
+    normalize_features: bool = True
+    val_fraction: float = 0.15
 
 
 class XGBCfg(BaseModel):
@@ -124,18 +133,31 @@ class LSTMCfg(BaseModel):
     ensemble_size: int = 3
 
 
+class EnsembleCfg(BaseModel):
+    """Heterogeneous soft-vote ensemble over base learners."""
+
+    members: list[str] = Field(
+        default_factory=lambda: ["logistic", "random_forest", "xgboost"]
+    )
+    weights: str = "learned"  # "learned" | "uniform"
+    val_fraction: float = 0.2
+
+
 class ModelCfg(BaseModel):
     gru: GRUCfg = Field(default_factory=GRUCfg)
     xgb: XGBCfg = Field(default_factory=XGBCfg)
     rf: RFCfg = Field(default_factory=RFCfg)
     lr: LRCfg = Field(default_factory=LRCfg)
     lstm: LSTMCfg = Field(default_factory=LSTMCfg)
+    ensemble: EnsembleCfg = Field(default_factory=EnsembleCfg)
 
 
 class UncertaintyCfg(BaseModel):
     method: str = "split_conformal"
     alpha: float = 0.10
     normalize_by: str = "ensemble_std"
+    n_ensemble_members: int = 5
+    n_bootstraps: int = 30
 
 
 class CalibrationCfg(BaseModel):

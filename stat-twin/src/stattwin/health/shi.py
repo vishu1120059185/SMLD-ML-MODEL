@@ -315,6 +315,7 @@ def compute_shi(
         for unit in units:
             unit_data = df_sorted[df_sorted[unit_col] == unit].reset_index(drop=True)
             values = unit_data[col].values.astype(np.float64)
+            baseline_vals = values[:baseline_cycles]
 
             for ec in evidence_components:
                 if ec.name == "deviation":
@@ -323,8 +324,12 @@ def compute_shi(
                     raw = _compute_trend(values, bl_std, deg_sign)
                 elif ec.name == "ewma":
                     raw = _compute_ewma(values, alpha=ewma_alpha)
-                elif ec.name == "variance" or ec.name == "corr_shift":
+                elif ec.name == "variance":
                     raw = _compute_variance(values, window=variance_window)
+                elif ec.name == "corr_shift":
+                    raw = _compute_corr_shift(
+                        values, baseline_vals, window=variance_window
+                    )
                 else:
                     raw = np.zeros_like(values)
 

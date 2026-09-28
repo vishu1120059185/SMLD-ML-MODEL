@@ -1,16 +1,23 @@
 """Experiment e9 – Uncertainty Method Comparison.
 
-Compares four uncertainty quantification methods:
-  1. Split conformal prediction
-  2. Ensemble variance
-  3. Quantile regression
-  4. Bootstrap prediction intervals
+Compares four uncertainty quantification methods for RUL prediction
+(all calibrated against a unit-disjoint inner calibration split):
 
-Outputs comparison tables and charts to ``results/e9/``.
+  1. Split conformal prediction (normalised nonconformity scores)
+  2. Ensemble variance – multi-seed XGBoost members; interval =
+     ensemble mean ± z · sqrt(between-member variance + calibration
+     residual variance)
+  3. Quantile bootstrap – residual quantiles estimated on the
+     calibration split and added to point predictions
+  4. Bootstrap prediction intervals – pairs bootstrap of the training
+     rows **plus** sampled calibration residuals (parameter + aleatoric
+     uncertainty)
+
+Outputs comparison tables and charts to ``results/e9_uncertainty_comparison/``.
 
 Usage::
 
-    python -m stattwin.experiments.e9_uncertainty_comparison --ds FD001 --profile smoke
+    python -m stattwin.experiments.e9_uncertainty_comparison --ds FD001 --profile fast
 """
 
 from __future__ import annotations
@@ -68,51 +75,81 @@ def _split_conformal(
 def _ensemble_variance(
     ensemble_preds: list[np.ndarray],
     alpha: float = 0.10,
+    resid_std: float | None = None,
 ) -> dict[str, Any]:
-    """Ensemble variance: mean ± z * std."""
+    """Ensemble variance: mean ± z * sqrt(var_between + var_residual).
+
+    Parameters
+    ----------
+    ensemble_preds:
+        Per-member point predictions on the same rows.
+    alpha:
+        Two-sided error rate (0.10 -> 90 % interval).
+    resid_std:
+        Aleatoric residual standard deviation estimated on a held-out
+        calibration split.  Combined in quadrature with the
+        between-member (epistemic) spread; *None* uses member variance
+        alone.
+    """
     from scipy.stats import norm
 
     stack = np.stack(ensemble_preds, axis=0)
     mean = np.mean(stack, axis=0)
-    std = np.std(stack, axis=0, ddof=1)
+    std_between = np.std(stack, axis=0, ddof=1) if len(ensemble_preds) > 1 else np.zeros_like(mean)  # noqa: E501
+    if resid_std is not None:
+        total_std = np.sqrt(std_between**2 + float(resid_std) ** 2)
+    else:
+        total_std = std_between
     z = norm.ppf(1 - alpha / 2)
-    lower = mean - z * std
-    upper = mean + z * std
+    lower = mean - z * total_std
+    upper = mean + z * total_std
     return {
         "method": "ensemble_variance",
         "mean": mean,
-        "std": std,
+        "std": total_std,
+        "std_between": std_between,
+        "resid_std": resid_std,
         "lower": lower,
         "upper": upper,
     }
 
 
 def _quantile_regression(
-    y_true: np.ndarray, y_pred: np.ndarray,
+    y_true_cal: np.ndarray, y_pred_cal: np.ndarray,
     alpha: float = 0.10,
-    n_bootstrap: int = 100,
+    n_bootstrap: int = 30,
 ) -> dict[str, Any]:
-    """Bootstrap quantile estimation of prediction intervals."""
+    """Residual-quantile intervals via bootstrap averaging.
+
+    Residual quantiles are estimated on a **calibration** split and
+    returned as offsets to be added to point predictions elsewhere;
+    the caller must never use test labels here.
+
+    Returns
+    -------
+    dict with ``lower_offset`` / ``upper_offset`` (scalars).
+    """
     rng = np.random.default_rng(42)
-    residuals = y_true - y_pred
+    residuals = y_true_cal - y_pred_cal
+    n = len(residuals)
+    if n == 0:
+        return {"method": "quantile_bootstrap", "lower_offset": 0.0, "upper_offset": 0.0}  # noqa: E501
 
     lower_q = alpha / 2
     upper_q = 1 - alpha / 2
 
-    lower_bounds = []
-    upper_bounds = []
+    lower_bounds: list[float] = []
+    upper_bounds: list[float] = []
     for _ in range(n_bootstrap):
-        idx = rng.integers(0, len(residuals), size=len(residuals))
+        idx = rng.integers(0, n, size=n)
         boot_resid = residuals[idx]
-        lower_bounds.append(np.percentile(boot_resid, 100 * lower_q))
-        upper_bounds.append(np.percentile(boot_resid, 100 * upper_q))
+        lower_bounds.append(float(np.percentile(boot_resid, 100 * lower_q)))
+        upper_bounds.append(float(np.percentile(boot_resid, 100 * upper_q)))
 
-    lower = y_pred + np.mean(lower_bounds)
-    upper = y_pred + np.mean(upper_bounds)
     return {
         "method": "quantile_bootstrap",
-        "lower": lower,
-        "upper": upper,
+        "lower_offset": float(np.mean(lower_bounds)),
+        "upper_offset": float(np.mean(upper_bounds)),
     }
 
 
@@ -120,11 +157,22 @@ def _bootstrap_pi(
     model_template, X_train: pd.DataFrame, y_train: pd.DataFrame,
     X_test: pd.DataFrame,
     feature_cols: list[str],
-    n_bootstraps: int = 50,
+    n_bootstraps: int = 30,
     alpha: float = 0.10,
     seed: int = 42,
+    residuals: np.ndarray | None = None,
 ) -> dict[str, Any]:
     """Bootstrap prediction intervals via resampled model fits.
+
+    Each replicate refits the model on a **unit-level cluster
+    bootstrap** of the training data (rows within a unit stay together,
+    so temporal correlation is preserved and every replicate keeps both
+    label classes) and predicts on ``X_test``.  When ``residuals``
+    (calibration residuals ``y_true - y_pred``) are supplied, a residual
+    draw is added to every replicate so the interval captures
+    **aleatoric** noise as well as parameter uncertainty – without it
+    the percentile band collapses onto the (nearly deterministic)
+    ensemble spread.
 
     ``model_template`` may be a fitted model instance (deep-copied) or a
     model class (instantiated with default horizons).
@@ -134,15 +182,28 @@ def _bootstrap_pi(
     rng = np.random.default_rng(seed)
     test_preds = []
     n = len(X_train)
+    n_test = len(X_test)
     fit_cols = feature_cols + ["unit_id", "cycle"]
     if "RUL" in X_train.columns:
         fit_cols = fit_cols + ["RUL"]
 
+    # Group training rows by unit once (cluster bootstrap)
+    if "unit_id" in X_train.columns:
+        unit_codes, unit_list = pd.factorize(X_train["unit_id"], sort=True)
+        row_of_unit = [np.flatnonzero(unit_codes == i) for i in range(len(unit_list))]
+        n_clusters = len(unit_list)
+    else:
+        row_of_unit = None
+        n_clusters = n
+
     for _b in range(n_bootstraps):
-        # Row bootstrap: resample X and multi-horizon y together
-        idx = rng.integers(0, n, size=n)
-        X_boot = X_train.iloc[idx].reset_index(drop=True)
-        y_boot = y_train.iloc[idx].reset_index(drop=True)
+        if row_of_unit is not None:
+            chosen = rng.integers(0, n_clusters, size=n_clusters)
+            boot_idx = np.concatenate([row_of_unit[c] for c in chosen])
+        else:
+            boot_idx = rng.integers(0, n, size=n)
+        X_boot = X_train.iloc[boot_idx].reset_index(drop=True)
+        y_boot = y_train.iloc[boot_idx].reset_index(drop=True)
 
         if isinstance(model_template, type):
             m = model_template(horizons=list(_HZ))
@@ -150,10 +211,17 @@ def _bootstrap_pi(
             m = copy.deepcopy(model_template)
         try:
             m.fit(X_boot[fit_cols], y_boot)
-            pred = m.predict_rul(X_test[feature_cols + ["unit_id", "cycle"]])
-            test_preds.append(np.asarray(pred, dtype=float))
+            pred = np.asarray(
+                m.predict_rul(X_test[feature_cols + ["unit_id", "cycle"]]),
+                dtype=float,
+            )
         except Exception:
             continue
+
+        if residuals is not None and len(residuals) > 0:
+            noise = rng.choice(np.asarray(residuals, dtype=float), size=n_test)
+            pred = pred + noise
+        test_preds.append(pred)
 
     if not test_preds:
         return {"method": "bootstrap", "error": "all bootstraps failed"}
@@ -170,6 +238,8 @@ def _bootstrap_pi(
         "mean": mean,
         "std": np.std(stack, axis=0),
         "n_successful_bootstraps": len(test_preds),
+        "residual_augmented": residuals is not None,
+        "bootstrap_unit": "cluster" if row_of_unit is not None else "row",
     }
 
 
@@ -183,8 +253,15 @@ def _compare_uncertainty_methods(
     """Compare all four uncertainty methods via OOF evaluation."""
     splits = make_group_kfold_splits(X, n_splits=cfg.split.n_splits, seed=cfg.seed)
     alpha = cfg.uncertainty.alpha
+    n_members = cfg.uncertainty.n_ensemble_members
+    n_bootstraps = cfg.uncertainty.n_bootstraps
 
-    model = XGBoostModel(horizons=FAILURE_HORIZONS)
+    model = XGBoostModel(
+        n_estimators=cfg.model.xgb.n_estimators,
+        max_depth=cfg.model.xgb.max_depth,
+        learning_rate=cfg.model.xgb.learning_rate,
+        horizons=FAILURE_HORIZONS,
+    )
 
     method_results: dict[str, list[dict]] = {
         "split_conformal": [],
@@ -225,6 +302,7 @@ def _compare_uncertainty_methods(
 
         rul_cal_true = X_cal["RUL"].values.astype(float) if "RUL" in X_cal.columns else rul_cal.astype(float)  # noqa: E501
         rul_val_true = X_val["RUL"].values.astype(float) if "RUL" in X_val.columns else rul_val.astype(float)  # noqa: E501
+        cal_resid = rul_cal_true - rul_cal
 
         # 1. Split conformal
         sigma_cal = np.abs(rul_cal - rul_cal.mean()) + 1.0
@@ -236,28 +314,53 @@ def _compare_uncertainty_methods(
             "picp": im.picp, "mean_width": im.mean_width, "winkler": im.winkler,
         })
 
-        # 2. Ensemble variance (simulate with 3 perturbations)
-        preds_ens = []
-        for noise_scale in [0.02, 0.05, 0.1]:
-            noisy_pred = rul_val + np.random.default_rng(42).normal(0, noise_scale, size=len(rul_val))  # noqa: E501
-            preds_ens.append(noisy_pred)
-        ens = _ensemble_variance(preds_ens, alpha)
-        im_ens = interval_metrics(rul_val_true, np.array(ens["lower"]), np.array(ens["upper"]), alpha)  # noqa: E501
-        method_results["ensemble_variance"].append({
-            "picp": im_ens.picp, "mean_width": im_ens.mean_width, "winkler": im_ens.winkler,
-        })
+        # 2. Ensemble variance: multi-seed XGB members + calibration residuals
+        member_preds = []
+        for b in range(n_members):
+            try:
+                mb = XGBoostModel(
+                    n_estimators=cfg.model.xgb.n_estimators,
+                    max_depth=cfg.model.xgb.max_depth,
+                    learning_rate=cfg.model.xgb.learning_rate,
+                    random_state=cfg.seed + b,
+                    horizons=FAILURE_HORIZONS,
+                )
+                mb.fit(X_fit[fit_cols], y_fit)
+                member_preds.append(np.asarray(
+                    mb.predict_rul(X_val[available + ["unit_id", "cycle"]]),
+                    dtype=float,
+                ))
+            except Exception as exc:  # noqa: BLE001 – skip failed members
+                print(f"    ensemble member {b} failed: {exc}")
+        if len(member_preds) >= 2:
+            resid_std = max(float(np.std(cal_resid)), 1.0)
+            ens = _ensemble_variance(member_preds, alpha, resid_std=resid_std)
+            im_ens = interval_metrics(
+                rul_val_true, np.asarray(ens["lower"]), np.asarray(ens["upper"]), alpha
+            )
+            method_results["ensemble_variance"].append({
+                "picp": im_ens.picp, "mean_width": im_ens.mean_width,
+                "winkler": im_ens.winkler,
+            })
+        else:
+            print(f"    ensemble_variance fold {fold_idx}: <2 members, skipped")
 
-        # 3. Quantile bootstrap
-        qboot = _quantile_regression(rul_val_true, rul_val.astype(float), alpha)
-        im_qb = interval_metrics(rul_val_true, np.array(qboot["lower"]), np.array(qboot["upper"]), alpha)  # noqa: E501
+        # 3. Quantile bootstrap (residual quantiles from calibration split)
+        qboot = _quantile_regression(
+            rul_cal_true, rul_cal.astype(float), alpha, n_bootstrap=n_bootstraps
+        )
+        lower_qb = rul_val.astype(float) + qboot["lower_offset"]
+        upper_qb = rul_val.astype(float) + qboot["upper_offset"]
+        im_qb = interval_metrics(rul_val_true, lower_qb, upper_qb, alpha)
         method_results["quantile_bootstrap"].append({
             "picp": im_qb.picp, "mean_width": im_qb.mean_width, "winkler": im_qb.winkler,
         })
 
-        # 4. Bootstrap PI
+        # 4. Bootstrap PI with residual augmentation
         boot = _bootstrap_pi(
             model, X_fit, y_fit,
-            X_val, available, n_bootstraps=15, alpha=alpha, seed=42,
+            X_val, available, n_bootstraps=n_bootstraps, alpha=alpha, seed=42,
+            residuals=cal_resid,
         )
         if "error" not in boot:
             im_boot = interval_metrics(rul_val_true, np.array(boot["lower"]), np.array(boot["upper"]), alpha)  # noqa: E501
@@ -390,7 +493,7 @@ def main() -> None:
     if not raw_path.exists():
         raise FileNotFoundError(f"Raw file not found: {raw_path}")
 
-    df = load_cmapss(raw_path, add_labels=True)
+    df = load_cmapss(raw_path, add_labels=True, rul_clip=cfg.dataset.rul_clip)
     out_dir = setup_output("e9_uncertainty_comparison")
 
     with Timer() as t:
