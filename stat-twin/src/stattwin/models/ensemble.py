@@ -189,15 +189,19 @@ class EnsembleModel(BaseModel):
             names = [n for n, _ in scratch]
             # Coordinate ascent on a simplex: start uniform, greedy refine.
             best = np.full(n_m, 1.0 / n_m)
+            member_proba = {
+                n: proba_va[n][label_cols].to_numpy(dtype=float) for n in names
+            }
+            y_true = y_va.to_numpy(dtype=float)
 
             def _logloss(w: np.ndarray) -> float:
-                acc = np.zeros(len(y_va))
+                acc = np.zeros_like(y_true)
                 for wi, name in zip(w, names, strict=True):
-                    p = proba_va[name][label_cols].to_numpy()
-                    acc = acc + wi * p
+                    acc = acc + wi * member_proba[name]
                 acc = np.clip(acc, 1e-9, 1 - 1e-9)
-                yt = y_va.to_numpy(dtype=float)
-                return float(-np.mean(yt * np.log(acc) + (1 - yt) * np.log(1 - acc)))
+                return float(
+                    -np.mean(y_true * np.log(acc) + (1 - y_true) * np.log(1 - acc))
+                )
 
             best_ll = _logloss(best)
             rng = np.random.default_rng(self.random_state)
@@ -207,6 +211,24 @@ class EnsembleModel(BaseModel):
                 if ll < best_ll:
                     best_ll = ll
                     best = cand
+            # Deterministic coordinate refinement (hill-climb on the simplex)
+            step = 0.2
+            for _ in range(30):
+                improved = False
+                for k in range(n_m):
+                    for delta in (step, -step):
+                        cand = best.copy()
+                        cand[k] += delta
+                        if cand[k] < 0:
+                            continue
+                        cand = cand / cand.sum()
+                        ll = _logloss(cand)
+                        if ll < best_ll - 1e-9:
+                            best_ll, best, improved = ll, cand, True
+                if not improved:
+                    step *= 0.5
+                    if step < 1e-3:
+                        break
             prob_w = {n: float(w) for n, w in zip(names, best, strict=True)}
         else:
             prob_w = {n: 1.0 / max(n_m, 1) for n, _ in scratch}
@@ -229,6 +251,23 @@ class EnsembleModel(BaseModel):
                 if mae < best_mae:
                     best_mae = mae
                     best_rw = cand
+            step = 0.2
+            for _ in range(30):
+                improved = False
+                for k in range(n_m):
+                    for delta in (step, -step):
+                        cand = best_rw.copy()
+                        cand[k] += delta
+                        if cand[k] < 0:
+                            continue
+                        cand = cand / cand.sum()
+                        mae = float(np.mean(np.abs(rul_true - preds @ cand)))
+                        if mae < best_mae - 1e-9:
+                            best_mae, best_rw, improved = mae, cand, True
+                if not improved:
+                    step *= 0.5
+                    if step < 1e-3:
+                        break
             rul_w = {n: float(w) for n, w in zip(names, best_rw, strict=True)}
         else:
             rul_w = {n: 1.0 / max(n_m, 1) for n, _ in scratch}
