@@ -21,7 +21,8 @@ import numpy as np
 
 __all__ = ["generate_report"]
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# stat-twin/  <- parents[3]  (src/stattwin/reports/generate.py)
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _RESULTS_DIR = _PROJECT_ROOT / "results"
 _OUTPUT_DIR = _PROJECT_ROOT / "reports"
 
@@ -31,12 +32,34 @@ _OUTPUT_DIR = _PROJECT_ROOT / "reports"
 # ---------------------------------------------------------------------------
 
 def _load_results(experiment: str) -> dict[str, Any] | None:
-    """Load results JSON for an experiment directory."""
-    path = _RESULTS_DIR / experiment / f"{experiment}.json"
-    if not path.exists():
+    """Load results JSON for an experiment directory.
+
+    Experiments write ``<exp>_results.json`` (e.g. ``e2_model_comparison``
+    → ``e2_model_comparison/e2_results.json``), while a few legacy
+    directories use ``results.json`` or ``<exp>.json``.  All three layouts
+    are probed so the report never silently degrades to "no results".
+    """
+    directory = _RESULTS_DIR / experiment
+    if not directory.is_dir():
         return None
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
+    short = experiment.split("_", 1)[0]  # "e2_model_comparison" -> "e2"
+    candidates = [
+        directory / f"{short}_results.json",
+        directory / f"{experiment}_results.json",
+        directory / "results.json",
+        directory / f"{experiment}.json",
+    ]
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(data, dict) and data:
+            return data
+    return None
 
 
 def _fmt(val: Any, decimals: int = 4) -> str:

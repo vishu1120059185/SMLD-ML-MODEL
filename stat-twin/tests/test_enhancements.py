@@ -713,6 +713,51 @@ class TestE2Checkpointing:
         assert _read_json(bad) is None
 
 
+class TestReportGeneration:
+    """The report generator silently produced "no results" for every
+    experiment because it resolved the project root one level too shallow
+    and looked for ``<exp>.json`` instead of ``<exp>_results.json``."""
+
+    def test_project_root_points_at_repo(self):
+        from stattwin.reports.generate import _PROJECT_ROOT, _RESULTS_DIR
+
+        assert _PROJECT_ROOT.name == "stat-twin"
+        assert _RESULTS_DIR.is_dir(), f"{_RESULTS_DIR} does not exist"
+        assert (_RESULTS_DIR / "e2_model_comparison").is_dir()
+
+    def test_loads_real_experiment_results(self):
+        from stattwin.reports.generate import _load_results
+
+        data = _load_results("e2_model_comparison")
+        assert data is not None, "e2 results not found by the report loader"
+        assert isinstance(data.get("models"), list)
+        assert len(data["models"]) > 0
+
+    def test_missing_experiment_returns_none(self):
+        from stattwin.reports.generate import _load_results
+
+        assert _load_results("e99_does_not_exist") is None
+
+    def test_e2_table_has_real_rows(self):
+        from stattwin.reports.generate import _load_results, _table_e2
+
+        markdown = _table_e2(_load_results("e2_model_comparison"))
+        assert "No results" not in markdown
+        assert "| Model |" in markdown
+        # at least one real AUC value rendered
+        assert any(
+            "0.9" in line or "0.8" in line
+            for line in markdown.splitlines()
+            if line.startswith("|")
+        )
+
+    def test_e9_table_has_all_four_methods(self):
+        from stattwin.reports.generate import _load_results, _table_e9
+
+        markdown = _table_e9(_load_results("e9_uncertainty_comparison"))
+        assert "No results" not in markdown
+
+
 # ---------------------------------------------------------------------------
 # e9 uncertainty helpers
 # ---------------------------------------------------------------------------
