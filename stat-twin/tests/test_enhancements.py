@@ -625,6 +625,93 @@ class TestHybridModelTraining:
         assert np.all(np.diff(arr, axis=1) >= -1e-9)
 
 
+class TestRiskTimeline:
+    """The risk chart rendered a flat zero line because the empirical
+    estimator can only fire once RUL crosses the horizon, and the
+    snapshot unit was chosen far too early in life."""
+
+    def test_empirical_series_is_causal(self):
+        from stattwin.app_data import _failure_probability_from_rul
+
+        rul = np.array([10.0 - i for i in range(20)])  # 10 -> -9
+        probs = _failure_probability_from_rul(rul, 5)
+        # first rows lack history -> NaN, not a fabricated 0
+        assert np.isnan(probs[0])
+        assert not np.isnan(probs[2])
+        # P(RUL<=5) must rise as the trajectory approaches failure
+        assert probs[-1] > probs[5]
+
+    def test_empirical_series_respects_horizon(self):
+        from stattwin.app_data import _failure_probability_from_rul
+
+        rul = np.array([float(100 - i) for i in range(60)])
+        p10 = _failure_probability_from_rul(rul, 10)
+        p50 = _failure_probability_from_rul(rul, 50)
+        # a longer horizon is crossed earlier -> higher probability
+        assert p50[-1] >= p10[-1]
+
+    def test_empty_input(self):
+        from stattwin.app_data import _failure_probability_from_rul
+
+        assert len(_failure_probability_from_rul(np.array([]), 30)) == 0
+
+    def test_model_series_is_unit_disjoint(self):
+        """The scored unit must be excluded from the classifier's fit set."""
+        from stattwin.app_data import _model_risk_series
+
+        rows = []
+        for uid in range(1, 7):
+            for c in range(1, 41):
+                rows.append(
+                    {
+                        "unit_id": uid,
+                        "cycle": c,
+                        "RUL": float(40 - c),
+                        "sensor_1": 100.0 + uid + 0.5 * c + (c % 3),
+                        "sensor_2": 200.0 + c,
+                        "fail_h30": int(40 - c <= 30),
+                    }
+                )
+        df = pd.DataFrame(rows)
+        sensor_cols = ["sensor_1", "sensor_2"]
+        score = df[df.unit_id == 6].reset_index(drop=True)
+        probs = _model_risk_series(df, score, sensor_cols, horizon=30)
+        assert probs is not None, "model risk series unexpectedly unavailable"
+        assert len(probs) == len(score)
+        assert ((probs >= 0) & (probs <= 1)).all()
+
+    def test_model_series_returns_none_without_history(self):
+        from stattwin.app_data import _model_risk_series
+
+        tiny = pd.DataFrame(
+            {
+                "unit_id": [1, 1, 1, 1],
+                "cycle": [1, 2, 3, 4],
+                "RUL": [3.0, 2.0, 1.0, 0.0],
+                "sensor_1": [1.0, 2.0, 3.0, 4.0],
+                "fail_h30": [0, 0, 1, 1],
+            }
+        )
+        # a single unit cannot be held out — the caller must fall back
+        assert _model_risk_series(tiny, tiny, ["sensor_1"], horizon=30) is None
+
+    def test_risk_artifact_is_not_flat(self, tmp_path):
+        """End-to-end guard: the shipped artifact must carry a real curve."""
+        import json
+        from pathlib import Path
+
+        real = (
+            Path(__file__).resolve().parents[1]
+            / "results" / "MACHINE-001" / "risk_timeline.json"
+        )
+        if not real.exists():
+            pytest.skip("app_data has not been generated yet")
+        data = json.loads(real.read_text(encoding="utf-8"))
+        risk = [v for v in data["risk"] if v is not None]
+        assert max(risk) > 0.01, "risk timeline is flat — chart would be empty"
+        assert any(v > 0.001 for v in risk)
+
+
 # ---------------------------------------------------------------------------
 # e2 checkpointing / resume
 # ---------------------------------------------------------------------------

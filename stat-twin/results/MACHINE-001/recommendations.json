@@ -1,6 +1,6 @@
 [
   {
-    "text": "Prioritise inspection at the earliest feasible opportunity. Consider reducing operational load if practical. Increase monitoring frequency. (tier=High, P(+30)=0.000, confidence=Normal)",
+    "text": "Prioritise inspection at the earliest feasible opportunity. Consider reducing operational load if practical. Increase monitoring frequency. (tier=High, P(+30)=0.033, confidence=Normal)",
     "priority": "high",
     "provenance": "PREDICTED",
     "risk_tier": "High",

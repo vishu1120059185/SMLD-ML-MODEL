@@ -70,18 +70,88 @@ def _failure_probability_from_rul(
     rul: np.ndarray,
     horizon: int,
     window: int = 30,
+    min_history: int = 3,
 ) -> np.ndarray:
-    """Isotonic-style empirical P(RUL <= h) using a causal rolling window."""
+    """Causal empirical P(RUL <= horizon) over a rolling window.
+
+    ``P_i = mean(RUL_j <= horizon for j in [i-window+1, i])`` — uses only
+    rows ``<= t``, so no future information can leak in.
+
+    The first rows of a unit have too few samples for a stable rate, so
+    they are reported as ``NaN`` and the dashboard renders gaps rather
+    than a flat line.
+
+    Note
+    ----
+    Because RUL decreases monotonically, this estimator is *zero* until
+    the trajectory itself reaches the horizon.  It is retained as a
+    model-free reference series; the headline risk timeline comes from the
+    trained classifier (see :func:`_model_risk_series`).
+    """
     n = len(rul)
     if n == 0:
         return np.zeros(0, dtype=float)
-    probs = np.zeros(n, dtype=float)
+    probs = np.full(n, np.nan, dtype=float)
     for i in range(n):
         lo = max(0, i - window + 1)
-        # causal: only rows <= t
-        hist = rul[lo : i + 1]
+        hist = rul[lo : i + 1]  # causal: only rows <= t
+        if len(hist) < min_history:
+            continue
         probs[i] = float(np.mean(hist <= horizon))
     return probs
+
+
+def _model_risk_series(
+    full_frame: pd.DataFrame,
+    score_frame: pd.DataFrame,
+    sensor_cols: list[str],
+    horizon: int = 30,
+) -> np.ndarray | None:
+    """Per-cycle failure probability from the trained XGBoost classifier.
+
+    Fits on **all units except** the one being scored, then predicts the
+    snapshot unit cycle-by-cycle, so the displayed risk trajectory comes
+    from a model that never saw that unit.  This gives a real risk curve
+    instead of a windowed frequency that stays at zero until RUL crosses
+    the horizon.
+
+    Returns ``None`` when the model cannot be fitted, letting the caller
+    fall back to the model-free series.
+    """
+    try:
+        from stattwin.data.schema import label_col_for
+        from stattwin.models import XGBoostModel
+    except ImportError:  # pragma: no cover - defensive
+        return None
+
+    label_col = label_col_for(horizon)
+    if label_col not in full_frame.columns or label_col not in score_frame.columns:
+        return None
+
+    feature_cols = [c for c in sensor_cols if c in full_frame.columns]
+    if not feature_cols:
+        return None
+
+    score_units = set(score_frame["unit_id"].unique())
+    train_rows = full_frame[~full_frame["unit_id"].isin(score_units)]
+    if train_rows.empty or train_rows["unit_id"].nunique() < 3:
+        return None
+    if train_rows[label_col].nunique() < 2:
+        return None
+
+    try:
+        model = XGBoostModel(n_estimators=200, max_depth=5, learning_rate=0.05)
+        model.fit(
+            train_rows[feature_cols + ["unit_id", "cycle"]],
+            train_rows[[label_col]].copy(),
+        )
+        proba = model.predict_proba(score_frame[feature_cols + ["unit_id", "cycle"]])
+        col = label_col_for(horizon)
+        if col not in proba.columns:
+            return None
+        return proba[col].to_numpy(dtype=float)
+    except Exception:  # noqa: BLE001 - risk series is decorative
+        return None
 
 
 def build_artifacts(
@@ -104,9 +174,25 @@ def build_artifacts(
         raw_path, add_labels=True, rul_clip=STATTWINConfig().dataset.rul_clip
     )
     if unit_id is None:
-        # Prefer a mid-life unit so the timeline shows degradation
-        unit_lengths = df.groupby("unit_id")["cycle"].max()
-        unit_id = int(unit_lengths.sort_values(ascending=False).index[0])
+        # Pick a unit whose snapshot lands in an informative regime.
+        #
+        # RUL decreases monotonically, so the *minimum* RUL inside the
+        # visible (causal) window is always the RUL at the snapshot.  The
+        # rolling risk estimator reports P(RUL <= horizon) from that window,
+        # so the timeline is only non-degenerate when the snapshot RUL
+        # itself falls inside the horizon band.  Prefer the largest such
+        # RUL (most remaining signal) and fall back to the longest unit if
+        # the dataset contains none.
+        lengths = df.groupby("unit_id")["cycle"].max()
+        best_unit, best_rul = None, -1.0
+        fallback = int(lengths.sort_values(ascending=False).index[0])
+        for uid in lengths.index:
+            unit = df[df["unit_id"] == uid].sort_values("cycle")
+            snap = max(2, int(len(unit) * 0.80))
+            rul_snap = float(unit["RUL"].iloc[snap - 1])
+            if 0 < rul_snap <= 30 and rul_snap > best_rul:
+                best_unit, best_rul = int(uid), rul_snap
+        unit_id = best_unit if best_unit is not None else fallback
 
     sensor_cols = [c for c in df.columns if c.startswith("sensor_")]
     shi = compute_shi(df[sensor_cols + ["unit_id", "cycle", "RUL"]].copy(),
@@ -188,13 +274,20 @@ def build_artifacts(
         "source": "compute_shi",
     }
 
-    # Risk timeline: empirical P(fail within 30 cycles) over time
+    # Risk timeline: trained-classifier P(fail within 30 cycles) per cycle
+    risk_source = "empirical_rul_cdf"
+    model_risk = _model_risk_series(df, unit_raw, sensor_cols, horizon=30)
+    if model_risk is not None and len(model_risk) == n:
+        risk_values = np.asarray(model_risk, dtype=float)
+        risk_source = "xgboost_classifier (unit-disjoint holdout)"
+    else:
+        risk_values = np.nan_to_num(p30_series, nan=0.0)
     risk_timeline = {
         "unit_id": int(unit_id),
         "timestamps": [int(c) for c in cycles],
-        "risk": [float(v) for v in p30_series],
+        "risk": [float(v) for v in risk_values],
         "provenance": "PREDICTED",
-        "source": "empirical_rul_cdf",
+        "source": risk_source,
     }
 
     health = {
@@ -275,13 +368,17 @@ def build_artifacts(
         "meta.json": meta,
     }
 
-    # Warning timeline (alert bands from risk)
-    risk_arr = np.asarray(p30_series, dtype=float)
-    alerts = np.where(risk_arr >= 0.7, "RED", np.where(risk_arr >= 0.3, "YELLOW", "GREEN"))
+    # Warning timeline (alert bands from the same risk series the chart uses)
+    risk_arr = np.asarray(risk_values, dtype=float)
+    risk_arr = np.nan_to_num(risk_arr, nan=0.0)
+    alerts = np.where(
+        risk_arr >= 0.7, "RED", np.where(risk_arr >= 0.3, "YELLOW", "GREEN")
+    )
     artifacts["warning_timeline.json"] = {
         "timestamps": [int(c) for c in cycles],
         "risk": [float(v) for v in risk_arr],
         "alert_level": [str(a) for a in alerts],
+        "source": risk_source,
         "provenance": "PREDICTED",
     }
 

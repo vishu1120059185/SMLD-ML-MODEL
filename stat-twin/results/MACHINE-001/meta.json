@@ -1,10 +1,10 @@
 {
   "dataset": "FD001",
-  "unit_id": 69,
+  "unit_id": 8,
   "n_units": 100,
-  "n_rows_unit": 289,
-  "n_rows_full": 362,
-  "snapshot_cycle": 289,
+  "n_rows_unit": 120,
+  "n_rows_full": 150,
+  "snapshot_cycle": 120,
   "snapshot_frac": 0.8,
   "built_from": "train_FD001.txt",
   "provenance": "OBSERVED"

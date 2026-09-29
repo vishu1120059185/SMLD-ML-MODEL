@@ -2,35 +2,35 @@
   "sensors": [
     {
       "name": "SENSOR_11",
-      "importance": 0.08712545092383993
+      "importance": 0.09391722299138898
     },
     {
       "name": "SENSOR_8",
-      "importance": 0.08650111712156322
-    },
-    {
-      "name": "SENSOR_13",
-      "importance": 0.08634422451147754
+      "importance": 0.09279074666355994
     },
     {
       "name": "SENSOR_12",
-      "importance": 0.08408849259351324
+      "importance": 0.09070860145452114
+    },
+    {
+      "name": "SENSOR_13",
+      "importance": 0.08576578020553915
     },
     {
       "name": "SENSOR_4",
-      "importance": 0.08198077237947606
-    },
-    {
-      "name": "SENSOR_7",
-      "importance": 0.07809287836920209
-    },
-    {
-      "name": "SENSOR_15",
-      "importance": 0.07510447081791422
+      "importance": 0.08409536348997503
     },
     {
       "name": "SENSOR_20",
-      "importance": 0.07399507909791528
+      "importance": 0.08092859267855511
+    },
+    {
+      "name": "SENSOR_7",
+      "importance": 0.07533991393946228
+    },
+    {
+      "name": "SENSOR_21",
+      "importance": 0.07496594874863588
     }
   ],
   "types": [

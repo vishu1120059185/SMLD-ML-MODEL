@@ -1,29 +1,29 @@
 [
   {
     "title": "sensor_11 trend",
-    "body": "Spearman ρ=0.863 with cycle (p=1.42e-108).",
+    "body": "Spearman ρ=0.809 with cycle (p=6.05e-36).",
     "sensor": "sensor_11",
     "provenance": "OBSERVED",
     "severity": "warning"
   },
   {
     "title": "sensor_8 association",
-    "body": "Spearman ρ=0.856 with cycle (p=2.16e-105).",
+    "body": "Spearman ρ=0.799 with cycle (p=1.60e-34).",
     "sensor": "sensor_8",
     "provenance": "OBSERVED",
     "severity": "info"
   },
   {
-    "title": "sensor_13 association",
-    "body": "Spearman ρ=0.855 with cycle (p=1.29e-104).",
-    "sensor": "sensor_13",
+    "title": "sensor_12 association",
+    "body": "Spearman ρ=-0.781 with cycle (p=4.37e-32).",
+    "sensor": "sensor_12",
     "provenance": "OBSERVED",
     "severity": "info"
   },
   {
-    "title": "sensor_12 association",
-    "body": "Spearman ρ=-0.833 with cycle (p=2.31e-94).",
-    "sensor": "sensor_12",
+    "title": "sensor_13 association",
+    "body": "Spearman ρ=0.739 with cycle (p=3.97e-27).",
+    "sensor": "sensor_13",
     "provenance": "OBSERVED",
     "severity": "info"
   }
