@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-09-24T05:30:05.967572+00:00",
-  "git_hash": "d4f136d",
+  "timestamp": "2026-09-29T07:53:11.553184+00:00",
+  "git_hash": "521b044",
   "git_dirty": true,
   "config_file": "C:\\Users\\AIML-DL-18\\Desktop\\AIML - 99\\SMLD ML MODEL\\stat-twin\\configs\\base.yaml",
   "config_hash": "439e9e7b699d",
@@ -114,10 +114,19 @@
     },
     "model": {
       "gru": {
-        "hidden": 64,
-        "layers": 2,
-        "dropout": 0.2,
-        "ensemble_size": 3
+        "hidden": 32,
+        "layers": 1,
+        "dropout": 0.1,
+        "ensemble_size": 1,
+        "seq_len": 30,
+        "lr": 0.001,
+        "batch_size": 64,
+        "epochs": 12,
+        "patience": 3,
+        "weight_decay": 1e-05,
+        "horizon_weight": 1.0,
+        "normalize_features": true,
+        "val_fraction": 0.15
       },
       "xgb": {
         "n_estimators": 400,
@@ -133,16 +142,33 @@
         "max_iter": 1000
       },
       "lstm": {
-        "hidden": 64,
-        "layers": 2,
-        "dropout": 0.2,
-        "ensemble_size": 3
+        "hidden": 32,
+        "layers": 1,
+        "dropout": 0.1,
+        "ensemble_size": 1
+      },
+      "ensemble": {
+        "members": [
+          "logistic",
+          "random_forest",
+          "xgboost"
+        ],
+        "weights": "learned",
+        "val_fraction": 0.2
+      },
+      "feature_screen": {
+        "enabled": true,
+        "top_k": 300,
+        "method": "correlation",
+        "min_keep": 30
       }
     },
     "uncertainty": {
       "method": "split_conformal",
       "alpha": 0.1,
-      "normalize_by": "ensemble_std"
+      "normalize_by": "ensemble_std",
+      "n_ensemble_members": 5,
+      "n_bootstraps": 30
     },
     "calibration": {
       "method": "isotonic",
@@ -155,6 +181,7 @@
       "far_budget": 0.05
     }
   },
-  "elapsed_seconds": 680.0680462,
+  "elapsed_seconds": 175.0624618999973,
+  "features": "engineered",
   "experiment": "e2_model_comparison"
 }

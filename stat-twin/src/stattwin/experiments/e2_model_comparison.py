@@ -144,6 +144,7 @@ def _build_models(cfg) -> list:
             batch_size=m.gru.batch_size,
             epochs=m.gru.epochs,
             patience=m.gru.patience,
+            val_fraction=m.gru.val_fraction,
             horizons=FAILURE_HORIZONS,
         )
     )

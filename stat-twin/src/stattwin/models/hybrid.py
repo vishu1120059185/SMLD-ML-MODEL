@@ -204,6 +204,7 @@ class HybridModel(BaseModel):
         batch_size: int = 64,
         epochs: int = 50,
         patience: int = 8,
+        val_fraction: float = 0.15,
         device: str | None = None,
         horizons: Sequence[int] | None = None,
     ) -> None:
@@ -220,6 +221,7 @@ class HybridModel(BaseModel):
         self.batch_size = batch_size
         self.epochs = epochs
         self.patience = patience
+        self.val_fraction = val_fraction
 
         if device is None:
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -232,6 +234,10 @@ class HybridModel(BaseModel):
         self._stat_cols: list[str] = []
         self._health_cols: list[str] = []
         self._all_feature_cols: list[str] = []
+        # fitted standardisation + RUL scale (set in fit)
+        self._feat_mean: np.ndarray | None = None
+        self._feat_std: np.ndarray | None = None
+        self._rul_scale: float = 1.0
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -258,11 +264,18 @@ class HybridModel(BaseModel):
     def _build_extended_sequences(
         self, X: pd.DataFrame
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Build sequences using sensor + stat + health features."""
+        """Build standardised sequences from sensor + stat + health columns.
+
+        Inputs are z-scored with statistics captured on the training frame
+        (see :meth:`fit`); rows with missing values are zeroed *after*
+        standardisation, which maps them to the column mean rather than
+        to an arbitrary constant.
+        """
         all_cols = self._all_feature_cols
-        # Pad seq_len for health/stat columns that might have NaN at start
-        first_row = X[all_cols].iloc[0:1].to_numpy(dtype=np.float64)
-        first_row = np.nan_to_num(first_row, nan=0.0)
+        block = X[all_cols].to_numpy(dtype=np.float64)
+        if self._feat_mean is not None and self._feat_std is not None:
+            block = (block - self._feat_mean) / self._feat_std
+        block = np.nan_to_num(block, nan=0.0, posinf=0.0, neginf=0.0)
 
         all_units = X[_UNIT_COL].unique()
         X_list: list[np.ndarray] = []
@@ -271,8 +284,16 @@ class HybridModel(BaseModel):
 
         for unit in all_units:
             unit_df = X[X[_UNIT_COL] == unit].sort_values(_CYCLE_COL)
-            vals = unit_df[all_cols].to_numpy(dtype=np.float64)
-            vals = np.nan_to_num(vals, nan=0.0)
+            rows = unit_df.index.to_numpy()
+            vals = X.reindex(rows)[all_cols].to_numpy(dtype=np.float64)
+            if self._feat_mean is not None and self._feat_std is not None:
+                vals = (vals - self._feat_mean) / self._feat_std
+            vals = np.nan_to_num(vals, nan=0.0, posinf=0.0, neginf=0.0)
+            if len(vals) == 0:
+                continue
+            # pad short sequences with THIS unit's earliest observed state,
+            # so a row's prediction never depends on the caller's row order
+            first_row = vals[0:1, :]
 
             for t in range(len(vals)):
                 start = max(0, t - self.seq_len + 1)
@@ -289,7 +310,7 @@ class HybridModel(BaseModel):
                     mask = np.ones(self.seq_len)
 
                 X_list.append(seq)
-                idx_list.append(unit_df.index[t])
+                idx_list.append(rows[t])
                 mask_list.append(mask)
 
         return (
@@ -322,21 +343,42 @@ class HybridModel(BaseModel):
         y_labels: np.ndarray,
         y_rul: np.ndarray,
         seed: int,
+        is_val: np.ndarray | None = None,
     ) -> _GRUNetwork | _LSTMNetwork:
-        """Train one GRU instance with a specific seed."""
+        """Train one GRU instance, early-stopping on held-out units.
+
+        When *is_val* marks a unit-disjoint inner validation split, the
+        reported loss and the early-stopping decision come from those
+        rows only; otherwise (or with an empty split) the training rows
+        are used and the caller gets the old in-sample behaviour.
+        """
         torch.manual_seed(seed)
         np.random.seed(seed)
 
         net = self._create_network(X_seq.shape[2]).to(self.device)
-        dataset = _SequenceDataset(X_seq, y_labels, y_rul)
-        loader = DataLoader(
-            dataset, batch_size=self.batch_size, shuffle=True, drop_last=False
+        is_val = np.zeros(len(X_seq), dtype=bool) if is_val is None else is_val
+        has_val = bool(is_val.any()) and bool((~is_val).any())
+
+        train_ds = _SequenceDataset(
+            X_seq[~is_val], y_labels[~is_val], y_rul[~is_val]
         )
+        loader = DataLoader(
+            train_ds, batch_size=self.batch_size, shuffle=True, drop_last=False
+        )
+        if has_val:
+            val_loader = DataLoader(
+                _SequenceDataset(X_seq[is_val], y_labels[is_val], y_rul[is_val]),
+                batch_size=self.batch_size,
+                shuffle=False,
+                drop_last=False,
+            )
+        else:
+            val_loader = loader
 
         pos_weights = []
         for i in range(y_labels.shape[1]):
-            n_pos = y_labels[:, i].sum()
-            n_neg = len(y_labels) - n_pos
+            n_pos = y_labels[~is_val, i].sum()
+            n_neg = int((~is_val).sum()) - n_pos
             pw = n_neg / max(n_pos, 1.0)
             pos_weights.append(min(pw, 50.0))
         pos_weight = torch.tensor(pos_weights, dtype=torch.float32, device=self.device)
@@ -354,7 +396,6 @@ class HybridModel(BaseModel):
 
         for _epoch in range(self.epochs):
             net.train()
-            total_loss = 0.0
             for X_b, y_b, r_b in loader:
                 X_b, y_b, r_b = X_b.to(self.device), y_b.to(self.device), r_b.to(self.device)
                 optimizer.zero_grad()
@@ -363,14 +404,14 @@ class HybridModel(BaseModel):
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1.0)
                 optimizer.step()
-                total_loss += loss.item()
 
-            # Evaluate on same data (OOF handled externally)
+            # Evaluate on the held-out units (never on the training rows
+            # when an inner split exists)
             net.eval()
             val_loss = 0.0
             n_val = 0
             with torch.no_grad():
-                for X_b, y_b, r_b in loader:
+                for X_b, y_b, r_b in val_loader:
                     X_b, y_b, r_b = (
                         X_b.to(self.device),
                         y_b.to(self.device),
@@ -414,6 +455,14 @@ class HybridModel(BaseModel):
     ) -> HybridModel:
         """Fit the hybrid model (GRU ensemble + optional tabular fallback).
 
+        The sequence branch standardises its inputs and scales the RUL
+        target, and early-stops on a **unit-disjoint inner split** — the
+        same protocol as :class:`~stattwin.models.gru.GRUModel`.  Without
+        those three steps the network sees unscaled sensors (magnitude
+        ~500) next to operating settings (0/1) and an RUL target in
+        cycles, whose MSE swamps the horizon BCE term, so it collapses to
+        a near-constant predictor.
+
         Parameters
         ----------
         X_train:
@@ -421,7 +470,7 @@ class HybridModel(BaseModel):
         y_train:
             Binary label DataFrame.
         groups:
-            Ignored.
+            Ignored (the inner split is derived from ``unit_id``).
         """
         self._sensor_cols, self._stat_cols, self._health_cols = self._select_features(X_train)
         self._all_feature_cols = self._sensor_cols + self._stat_cols + self._health_cols
@@ -435,25 +484,51 @@ class HybridModel(BaseModel):
             if col not in df.columns and col in y_train.columns:
                 df[col] = y_train[col].values
 
+        # --- feature standardisation (fit on training rows only) ----------
+        block = X_train[self._all_feature_cols]
+        self._feat_mean = block.mean(axis=0).to_numpy(dtype=np.float64)
+        std = block.std(axis=0).to_numpy(dtype=np.float64)
+        self._feat_std = np.where(std < 1e-8, 1.0, std)
+
+        # --- RUL target scale -------------------------------------------
+        if "RUL" in X_train.columns:
+            rul_vals = X_train["RUL"].to_numpy(dtype=np.float64)
+            self._rul_scale = max(float(np.nanmax(rul_vals)), 1.0)
+        else:
+            self._rul_scale = 1.0
+
         # Build sequences
         X_seq, row_idx, mask, first_row = self._build_extended_sequences(df)
         y_labels = np.zeros((len(X_seq), len(self.horizons)), dtype=np.float64)
-        y_rul = np.full(len(X_seq), 60.0, dtype=np.float64)
+        y_rul = np.full(len(X_seq), np.nan, dtype=np.float64)
 
-        # Fill labels/RUL from merged df
-        for i, idx in enumerate(row_idx):
-            for j, h in enumerate(self.horizons):
-                col = label_col_for(h)
-                if col in df.columns:
-                    y_labels[i, j] = df.loc[idx, col]
-            if "RUL" in df.columns:
-                y_rul[i] = df.loc[idx, "RUL"]
+        # Fill labels/RUL from merged df (vectorised, no per-row loop)
+        label_block = df[self.label_cols].reindex(row_idx)
+        y_labels = label_block.to_numpy(dtype=np.float64)
+        if "RUL" in df.columns:
+            y_rul = df["RUL"].reindex(row_idx).to_numpy(dtype=np.float64)
+        y_rul = np.where(np.isnan(y_rul), np.nanmean(y_rul) if np.any(
+            ~np.isnan(y_rul)) else 60.0, y_rul)
+        y_rul_scaled = y_rul / self._rul_scale
+
+        # --- unit-disjoint inner split for early stopping -----------------
+        unit_of_row = df[_UNIT_COL].reindex(row_idx).to_numpy()
+        is_val = np.zeros(len(row_idx), dtype=bool)
+        units = np.array(sorted(df[_UNIT_COL].unique()))
+        if self.val_fraction > 0 and len(units) >= 4:
+            n_val_units = max(1, int(round(self.val_fraction * len(units))))
+            rng = np.random.default_rng(42)
+            perm = rng.permutation(len(units))
+            is_val = np.isin(unit_of_row, units[perm[:n_val_units]])
 
         # Train ensemble of M seeds
         self._ensemble = []
         base_seed = 42
         for m in range(self.ensemble_size):
-            net = self._train_single_seed(X_seq, y_labels, y_rul, seed=base_seed + m * 17)
+            net = self._train_single_seed(
+                X_seq, y_labels, y_rul_scaled, seed=base_seed + m * 17,
+                is_val=is_val,
+            )
             self._ensemble.append(net)
 
         # Tabular fallback
@@ -465,7 +540,72 @@ class HybridModel(BaseModel):
         self.is_fitted = True
         return self
 
-    def _ensemble_predict_proba(self, X_seq: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def _predict_arrays(self, X: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+        """Run both branches once and return them aligned to ``X.index``.
+
+        Sequences are built in ``(unit, cycle)`` order, which is not
+        generally the caller's row order, so predictions are reindexed by
+        the row labels recorded during sequence construction.
+        """
+        df = X.copy()
+        for col in self.label_cols:
+            if col not in df.columns:
+                df[col] = 0
+
+        X_seq, row_idx, _mask, _first = self._build_extended_sequences(df)
+        seq_index = pd.Index(row_idx, name=X.index.name)
+
+        if self._ensemble:
+            mean_proba, _std = self._ensemble_predict_proba(X_seq)
+            rul_arr = self._ensemble_predict_rul(X_seq)
+        elif self._tabular is not None:
+            tab = self._tabular.predict_proba(X)
+            proba = tab.reindex(seq_index)
+            rul = self._tabular.predict_rul(X).reindex(seq_index)
+            rul_arr = rul.to_numpy(dtype=float)
+            mean_proba = proba[
+                [label_col_for(h) for h in self.horizons]
+            ].to_numpy(dtype=float)
+        else:
+            raise RuntimeError("Model not fitted.")
+
+        proba = pd.DataFrame(
+            {
+                label_col_for(h): mean_proba[:, i]
+                for i, h in enumerate(self.horizons)
+            },
+            index=seq_index,
+        ).reindex(X.index)
+        proba = proba.fillna(0.5)
+        if self.enforce_monotone:
+            proba = _enforce_monotone(proba, self.horizons)
+
+        rul = pd.Series(rul_arr, index=seq_index).reindex(X.index)
+        rul = rul.fillna(rul.median() if rul.notna().any() else 60.0)
+        return proba, np.maximum(rul.to_numpy(dtype=float), 0.0)
+
+    def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Predict per-horizon failure probabilities (ensemble mean)."""
+        if not self._ensemble and self._tabular is None:
+            raise RuntimeError("Model not fitted.")
+        proba, _rul = self._predict_arrays(X)
+        return proba
+
+    def predict_rul(self, X: pd.DataFrame) -> pd.Series:
+        """Predict point RUL.
+
+        Uses the sequence branch's regression head when available (the
+        tabular branch's RUL estimator is only trained if the fit frame
+        carried a ``RUL`` column), and is clipped at zero.
+        """
+        if not self._ensemble and self._tabular is None:
+            raise RuntimeError("Model not fitted.")
+        _proba, rul = self._predict_arrays(X)
+        return pd.Series(rul, index=X.index, name="RUL")
+
+    def _ensemble_predict_proba(
+        self, X_seq: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Run ensemble inference, return (mean_proba, std_proba)."""
         dataset = _SequenceDataset(
             X_seq,
@@ -491,40 +631,25 @@ class HybridModel(BaseModel):
 
         return mean_proba, std_proba
 
-    def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Predict per-horizon failure probabilities (ensemble mean)."""
-        if not self._ensemble:
-            if self._tabular is not None:
-                return self._tabular.predict_proba(X)
-            raise RuntimeError("Model not fitted.")
-
-        df = X.copy()
-        for col in self.label_cols:
-            if col not in df.columns:
-                df[col] = 0
-
-        X_seq, row_idx, mask, first_row = self._build_extended_sequences(df)
-        mean_proba, _ = self._ensemble_predict_proba(X_seq)
-
-        proba_dict = {
-            label_col_for(h): mean_proba[:, i]
-            for i, h in enumerate(self.horizons)
-        }
-        proba = pd.DataFrame(proba_dict, index=X.index)
-
-        if self.enforce_monotone:
-            proba = _enforce_monotone(proba, self.horizons)
-
-        return proba
-
-    def predict_rul(self, X: pd.DataFrame) -> pd.Series:
-        """Predict point RUL (ensemble mean via weighted horizon inversion)."""
-        proba = self.predict_proba(X)
-        h_arr = np.array(self.horizons, dtype=np.float64)
-        delta = np.diff(np.concatenate(([0.0], h_arr)))
-        p_survive = 1.0 - proba.values
-        rul = p_survive @ delta
-        return pd.Series(np.maximum(rul, 0.0), index=X.index, name="RUL")
+    def _ensemble_predict_rul(self, X_seq: np.ndarray) -> np.ndarray:
+        """Mean RUL from the sequence branch's regression head, un-scaled."""
+        dataset = _SequenceDataset(
+            X_seq,
+            np.zeros((len(X_seq), len(self.horizons))),
+            np.zeros(len(X_seq)),
+        )
+        loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
+        out: list[np.ndarray] = []
+        for net in self._ensemble:
+            net.eval()
+            preds: list[np.ndarray] = []
+            with torch.no_grad():
+                for X_b, _, _ in loader:
+                    X_b = X_b.to(self.device)
+                    _h_logits, r_pred = net(X_b)
+                    preds.append(r_pred.cpu().numpy().ravel())
+            out.append(np.concatenate(preds, axis=0))
+        return np.mean(np.stack(out, axis=0), axis=0) * self._rul_scale
 
     def score_raw(self, X: pd.DataFrame) -> pd.Series:
         """Return max horizon probability as the raw score."""

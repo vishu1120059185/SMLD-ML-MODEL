@@ -189,8 +189,9 @@ def test_comparison_builds_from_real_e2_e5():
     assert payload is not None
     assert payload["models"]
     assert "AUC" in payload["metrics"]
-    # Must NOT invent survival-model names from the old demo
-    banned = {"Cox PH", "RSF", "LSTM", "Survival SVM"}
+    # Must NOT invent survival-model names from the old demo.  ("LSTM" is
+    # no longer banned: e2 really trains an LSTM backbone and reports it.)
+    banned = {"Cox PH", "RSF", "Survival SVM"}
     assert banned.isdisjoint(set(payload["models"]))
 
 

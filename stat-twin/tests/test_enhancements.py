@@ -529,18 +529,121 @@ class TestImputeCausal:
         assert X["f"].tolist() == [1.0, 2.0, 3.0]
 
 
+class TestHybridModelTraining:
+    """Regression tests for the four defects that made HybridModel output
+    a near-constant predictor (OOF ROC-AUC 0.52, RUL MAE 65)."""
+
+    @staticmethod
+    def _hybrid(epochs=2, **kwargs):
+        params = dict(
+            hidden=8, layers=1, dropout=0.0, seq_len=10, ensemble_size=1,
+            epochs=epochs, patience=1, batch_size=64, val_fraction=0.25,
+            horizons=FAILURE_HORIZONS,
+        )
+        params.update(kwargs)
+        return HybridModel(**params)
+
+    def test_learns_signal_instead_of_collapsing(self):
+        df = _panel(n_units=8, n_cycles=70, seed=11)
+        model = self._hybrid(epochs=6)
+        model.fit(df, _labels(df))
+        proba = model.predict_proba(df)
+        # a collapsed net returns ~0.5 everywhere; a trained one spreads out
+        assert float(proba.values.std()) > 0.05
+        # and separates the classes: risky rows (RUL <= 10) score higher
+        risky = df["RUL"] <= 10
+        assert float(proba.loc[risky].mean().mean()) > float(
+            proba.loc[~risky].mean().mean()
+        )
+
+    def test_features_are_standardised(self):
+        df = _panel(n_units=6, n_cycles=70, seed=12)
+        model = self._hybrid(epochs=1)
+        model.fit(df, _labels(df))
+        assert model._feat_mean is not None
+        assert model._feat_std is not None
+        assert np.all(model._feat_std > 0)
+        # sequences must be centred: |mean| far below the raw sensor scale
+        seq, *_ = model._build_extended_sequences(df)
+        assert abs(float(np.nanmean(seq))) < 2.0
+
+    def test_rul_targets_are_scaled(self):
+        df = _panel(n_units=6, n_cycles=70, seed=13)
+        model = self._hybrid(epochs=1)
+        model.fit(df, _labels(df))
+        assert model._rul_scale == pytest.approx(float(df["RUL"].max()), rel=0.01)
+
+    def test_predictions_align_to_frame_index_when_shuffled(self):
+        """Sequences are built per unit; predictions must follow row labels."""
+        df = _panel(n_units=6, n_cycles=70, seed=14)
+        model = self._hybrid(epochs=1)
+        model.fit(df, _labels(df))
+        shuffled = df.sample(frac=1.0, random_state=3)
+        proba = model.predict_proba(shuffled)
+        rul = model.predict_rul(shuffled)
+        assert list(proba.index) == list(shuffled.index)
+        assert list(rul.index) == list(shuffled.index)
+
+        ordered = model.predict_proba(df)
+        key_o = df[["unit_id", "cycle"]].copy()
+        key_o["p"] = ordered["fail_h30"].to_numpy()
+        key_s = shuffled[["unit_id", "cycle"]].copy()
+        key_s["p"] = proba["fail_h30"].to_numpy()
+        merged = key_o.merge(key_s, on=["unit_id", "cycle"], suffixes=("_o", "_s"))
+        assert np.allclose(merged["p_o"], merged["p_s"], atol=1e-6)
+
+    def test_interleaved_units_keep_their_own_predictions(self):
+        """Row order that interleaves units must not scramble outputs."""
+        df = _panel(n_units=6, n_cycles=70, seed=15)
+        model = self._hybrid(epochs=1)
+        model.fit(df, _labels(df))
+        base = df.sort_values(["unit_id", "cycle"])
+        interleaved = (
+            df.sort_values(["cycle", "unit_id"]).sort_index(kind="stable")
+        )
+        p_base = model.predict_proba(base)["fail_h30"]
+        p_int = model.predict_proba(interleaved)["fail_h30"]
+        # same rows -> same predictions regardless of frame order
+        joined = pd.DataFrame({"b": p_base, "i": p_int}, index=p_base.index)
+        assert np.allclose(joined["b"], joined["i"], atol=1e-6)
+
+    def test_rul_uses_regression_head_and_is_nonnegative(self):
+        df = _panel(n_units=6, n_cycles=70, seed=16)
+        model = self._hybrid(epochs=3)
+        model.fit(df, _labels(df))
+        rul = model.predict_rul(df)
+        assert (rul >= 0).all()
+        # the regression head must actually track the target
+        assert float(np.corrcoef(rul.to_numpy(), df["RUL"].to_numpy())[0, 1]) > 0.5
+
+    def test_monotone_envelope_still_applied(self):
+        df = _panel(n_units=6, n_cycles=70, seed=17)
+        model = self._hybrid(epochs=1)
+        model.fit(df, _labels(df))
+        proba = model.predict_proba(df)
+        arr = proba.to_numpy()
+        assert np.all(np.diff(arr, axis=1) >= -1e-9)
+
+
 # ---------------------------------------------------------------------------
 # e2 checkpointing / resume
 # ---------------------------------------------------------------------------
 
 
 class TestE2Checkpointing:
+    @staticmethod
+    def _fingerprint():
+        return {
+            "features": "engineered",
+            "feature_screen": {"top_k": 300},
+            "model_signature": {"xgb": {"n_estimators": 400}},
+        }
+
     def test_build_results_marks_partial(self):
         from stattwin.config import STATTWINConfig
         from stattwin.experiments.e2_model_comparison import _build_results
 
         cfg = STATTWINConfig()
-        fp = {"features": "engineered", "feature_screen": {"top_k": 300}}
         rows = [
             {
                 "model": "XGBoostModel",
@@ -548,10 +651,10 @@ class TestE2Checkpointing:
                 "rul": {"rmse": 20.0, "mae": 12.0, "nasa_score": 300.0},
             }
         ]
-        partial = _build_results(cfg, fp, rows, partial=True)
+        partial = _build_results(cfg, self._fingerprint(), rows, partial=True)
         assert partial["partial"] is True
         assert partial["summary_table"][0]["rul_rmse"] == 20.0
-        final = _build_results(cfg, fp, rows, partial=False)
+        final = _build_results(cfg, self._fingerprint(), rows, partial=False)
         assert final["partial"] is False
 
     def test_error_rows_survive_summary(self):
@@ -561,7 +664,7 @@ class TestE2Checkpointing:
         cfg = STATTWINConfig()
         out = _build_results(
             cfg,
-            {"features": "raw", "feature_screen": {}},
+            self._fingerprint(),
             [{"model": "BrokenModel", "error": "boom"}],
             partial=True,
         )
@@ -575,7 +678,7 @@ class TestE2Checkpointing:
         )
 
         cfg = STATTWINConfig()
-        fp = {"features": "engineered", "feature_screen": {"top_k": 300}}
+        fp = self._fingerprint()
         rows = [
             {
                 "model": "GRUModel",
@@ -588,7 +691,18 @@ class TestE2Checkpointing:
         assert isinstance(loaded, dict)
         assert loaded["partial"] is True
         assert loaded["models"][0]["model"] == "GRUModel"
-        assert loaded["feature_screen"] == {"top_k": 300}
+        assert loaded["feature_screen"] == fp["feature_screen"]
+        # the signature is persisted so a config change invalidates the cache
+        assert loaded["model_signature"] == fp["model_signature"]
+
+    def test_model_signature_covers_hyperparameters(self):
+        from stattwin.config import load_config
+        from stattwin.experiments.e2_model_comparison import _model_signature
+
+        fast = _model_signature(load_config("configs/base.yaml", profile="fast"))
+        full = _model_signature(load_config("configs/base.yaml", profile="full"))
+        assert fast != full, "different profiles must not share a resume cache"
+        assert set(fast) == {"lr", "rf", "xgb", "gru", "lstm", "ensemble"}
 
     def test_read_json_missing_and_malformed(self, temp_dir):
         from stattwin.experiments.e2_model_comparison import _read_json
