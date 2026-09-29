@@ -12,6 +12,7 @@ import re
 import streamlit as st
 
 from stattwin.dashboard.components.motion import (
+    clean_html,
     count_up_html,
 )
 from stattwin.dashboard.components.motion import (
@@ -107,12 +108,43 @@ def _badge(label: str, bg: str, fg: str = "#FFFFFF") -> str:
     )
 
 
+def _md(html: str) -> None:
+    """``st.markdown`` for a hand-built HTML block (blank-line safe).
+
+    Streamlit's markdown renderer turns content after a blank line into a
+    fenced code block, which would leak raw HTML text into the page when
+    an optional part (delta, provenance, sensor, …) renders empty.
+    """
+    st.markdown(clean_html(html), unsafe_allow_html=True)
+
+
 def _tooltip(text: str) -> str:
     """Wrap text in a tooltip span."""
     return (
         f'<span class="st-tooltip-wrapper">{text}'
         f'<span class="st-tooltip-text">{text}</span></span>'
     )
+
+
+_BOLD = re.compile(r"\*\*(.+?)\*\*")
+_ITALIC = re.compile(r"(?<!\*)\*([^*\n]+)\*(?!\*)")
+_CODE = re.compile(r"`([^`\n]+)`")
+
+
+def _inline_markup(text: str) -> str:
+    """Convert a small, safe subset of markdown to HTML.
+
+    Artifact prose is written in markdown, but prose cards are rendered as
+    raw HTML — without this the reader sees literal ``**asterisks**``.
+    Only bold / italic / inline-code are handled, and the input is escaped
+    first so no HTML can be injected through artifact text.
+    """
+    escaped = (
+        str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    )
+    escaped = _CODE.sub(r"<code>\1</code>", escaped)
+    escaped = _BOLD.sub(r"<b>\1</b>", escaped)
+    return _ITALIC.sub(r"<em>\1</em>", escaped)
 
 
 def state_badge(state: str) -> str:
@@ -175,15 +207,14 @@ def kpi_card(
     label_html = _tooltip(label) if tooltip else label
     delta_html = f'<div class="st-kpi-delta">{delta}</div>' if delta else ""
     value_html = _maybe_count_up(value) if animate else str(value)
-    st.markdown(
+    _md(
         f"""
         <div class="st-kpi">
             <div class="st-kpi-label">{label_html}{prov_html}</div>
             <div class="st-kpi-value">{value_html}</div>
             {delta_html}
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
@@ -202,7 +233,7 @@ def evidence_card(
         if sensor
         else ""
     )
-    st.markdown(
+    _md(
         f"""
         <div class="st-card" style="border-left:3px solid {border};">
             <div style="display:flex; align-items:center; gap:8px;
@@ -211,10 +242,11 @@ def evidence_card(
                 {provenance_badge(provenance)}
                 {sensor_html}
             </div>
-            <div style="color:{MUTED}; font-size:0.84rem; line-height:1.5;">{body}</div>
+            <div style="color:{MUTED}; font-size:0.84rem; line-height:1.5;">
+                {_inline_markup(body)}
+            </div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
@@ -227,7 +259,7 @@ def recommendation_card(
     """Actionable recommendation card with priority and provenance."""
     prio_colors = {"high": DANGER, "medium": WARNING, "low": SUCCESS}
     border = prio_colors.get(priority, ACCENT)
-    st.markdown(
+    _md(
         f"""
         <div class="st-card" style="border-left:3px solid {border};">
             <div style="display:flex; align-items:center; gap:8px;
@@ -236,10 +268,11 @@ def recommendation_card(
                 {_badge(priority.upper(), border)}
                 {provenance_badge(provenance)}
             </div>
-            <div style="color:{MUTED}; font-size:0.84rem; line-height:1.5;">{text}</div>
+            <div style="color:{MUTED}; font-size:0.84rem; line-height:1.5;">
+                {_inline_markup(text)}
+            </div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
@@ -267,7 +300,7 @@ def delta_card(
     else:
         colour = DANGER
     prov_html = f" {provenance_badge(provenance)}" if provenance else ""
-    st.markdown(
+    _md(
         f"""
         <div class="st-kpi">
             <div class="st-kpi-label">{label}{prov_html}</div>
@@ -281,8 +314,7 @@ def delta_card(
                 </span>
             </div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
@@ -388,8 +420,7 @@ def page_header(title: str, subtitle: str = "", machine: str | None = None):
         meta_bits.append(machine)
     meta = f" · {' · '.join(meta_bits)}" if meta_bits else ""
     sub = f'<div class="st-page-sub">{subtitle}{meta}</div>' if subtitle or meta else ""
-    st.markdown(
+    _md(
         f'<div class="sw-reveal-left">'
-        f'<div class="st-page-title sw-shine">{title}</div>{sub}</div>',
-        unsafe_allow_html=True,
+        f'<div class="st-page-title sw-shine">{title}</div>{sub}</div>'
     )

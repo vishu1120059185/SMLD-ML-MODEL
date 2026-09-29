@@ -192,6 +192,7 @@ def _status_strip(machine: str) -> None:
     """
     from stattwin.dashboard.components.artifacts import load_artifact
     from stattwin.dashboard.components.motion import (
+        _md,
         progress_ring,
         pulsing_bars,
         stat_tile,
@@ -215,7 +216,7 @@ def _status_strip(machine: str) -> None:
         float(v) for v in (timeline.get("shi") or [])[-28:] if v is not None
     ]
 
-    c0, c1, c2, c3 = st.columns([1, 1, 1, 1.05])
+    c0, c1, c2, c3 = st.columns([1, 1, 1, 0.7])
     with c0:
         stat_tile(
             f'SHI · {prov}',
@@ -241,41 +242,36 @@ def _status_strip(machine: str) -> None:
             delay_ms=140,
         )
     with c3:
-        ring_col, ring_left, ring_right = st.columns([1, 1.35, 1])
-        with ring_col:
-            progress_ring(
-                shi * 100.0,
-                label="health",
-                value_text=f"{shi:.2f}",
-                color="#10B981" if shi < 0.4 else "#F59E0B",
-                size="92px",
+        progress_ring(
+            shi * 100.0,
+            label="health",
+            value_text=f"{shi:.2f}",
+            color="#10B981" if shi < 0.4 else "#F59E0B",
+            size="86px",
+        )
+
+    # SHI trajectory micro-visual (real artifact samples)
+    if shi_series:
+        bar_col, meta_col = st.columns([4, 1])
+        with bar_col:
+            _md(
+                '<div class="sw-tile" style="--d:210ms;padding:12px 16px;">'
+                '<div class="sw-tile-label">SHI recent trajectory</div>'
             )
-        with ring_left:
-            if shi_series:
-                st.markdown(
-                    '<div class="sw-tile-label" style="margin-bottom:6px;">'
-                    "SHI recent trajectory</div>",
-                    unsafe_allow_html=True,
-                )
-                pulsing_bars(
-                    shi_series,
-                    color="#3B82F6",
-                    height="42px",
-                )
-            else:
-                st.markdown(
-                    '<div style="color:#6B7280;font-size:.72rem;'
-                    'font-family:\'JetBrains Mono\',monospace;">'
-                    "no SHI timeline artifact</div>",
-                    unsafe_allow_html=True,
-                )
-        with ring_right:
-            st.markdown(
-                '<div class="sw-tile" style="--d:210ms;padding:12px 14px;">'
-                '<div class="sw-tile-label">artifacts</div>'
-                f'<div class="sw-tile-value" style="font-size:1.35rem;">{n_results}</div>'
-                '<div class="sw-tile-delta">result sets linked</div></div>',
-                unsafe_allow_html=True,
+            pulsing_bars(shi_series, color="#3B82F6", height="38px")
+            _md(
+                '<div class="sw-tile-delta" style="margin-top:6px;">'
+                f"last {len(shi_series)} samples · min {min(shi_series):.3f} · "
+                f"max {max(shi_series):.3f} · bars are relative</div>"
+            )
+        with meta_col:
+            stat_tile(
+                "artifacts",
+                str(n_results),
+                delta="result sets linked",
+                color="#8B5CF6",
+                delay_ms=260,
+                size="1.3rem",
             )
 
 

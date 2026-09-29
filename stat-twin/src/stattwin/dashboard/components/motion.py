@@ -554,9 +554,25 @@ def inject_motion() -> None:
     st.markdown(MOTION_CSS, unsafe_allow_html=True)
 
 
+def clean_html(text: str) -> str:
+    """Strip blank lines from an HTML block.
+
+    Streamlit's markdown renderer turns everything after a blank line into
+    a fenced code block, so a template with an empty optional part would
+    leak raw ``</div>`` text into the page.  Every renderer below pipes its
+    markup through this helper.
+    """
+    return "\n".join(line for line in text.splitlines() if line.strip())
+
+
+def _md(html: str) -> None:
+    """``st.markdown`` for a hand-built HTML block (blank-line safe)."""
+    st.markdown(clean_html(html), unsafe_allow_html=True)
+
+
 def aurora() -> None:
     """Render the animated ambient background + scroll progress rail."""
-    st.markdown(
+    _md(
         """
         <div class="sw-aurora" aria-hidden="true">
           <div class="sw-grid"></div>
@@ -567,7 +583,6 @@ def aurora() -> None:
         </div>
         <div class="sw-scrollrail" aria-hidden="true"></div>
         """,
-        unsafe_allow_html=True,
     )
 
 
@@ -600,33 +615,30 @@ def reveal(
         "left": "sw-reveal-left",
         "zoom": "sw-reveal-zoom",
     }.get(kind, "sw-reveal")
-    st.markdown(
+    _md(
         f'<div class="{cls}" style="--d:{delay_ms}ms;--dur:{duration};">'
         f"{html}</div>",
-        unsafe_allow_html=True,
     )
 
 
 def glow_rule() -> None:
     """Grow-in gradient rule used under section headers."""
-    st.markdown('<hr class="sw-hr">', unsafe_allow_html=True)
+    _md('<hr class="sw-hr">')
 
 
 def section_header(title: str, subtitle: str = "", *, delay_ms: int = 0) -> None:
     """Motion-slides style section header with animated accent rule."""
     sub = f'<div class="sw-hd-sub">{subtitle}</div>' if subtitle else ""
-    st.markdown(
+    _md(
         f'<div class="sw-hd" style="--d:{delay_ms}ms;">'
         f'<div class="sw-hd-title">{title}</div>{sub}</div>',
-        unsafe_allow_html=True,
     )
 
 
 def live_pill(text: str = "LIVE") -> None:
     """Pulsing live indicator pill with ping ring."""
-    st.markdown(
+    _md(
         f'<span class="sw-live"><span class="sw-live-dot"></span>{text}</span>',
-        unsafe_allow_html=True,
     )
 
 
@@ -690,7 +702,7 @@ def count_up(
         prefix=prefix,
         suffix=suffix,
     )
-    st.markdown(
+    _md(
         f"""
         <div class="sw-tile sw-spot sw-animborder"
              style="--d:{delay_ms}ms;--tile-c:{color}59;--fs:{size};">
@@ -700,7 +712,6 @@ def count_up(
           {delta_html}
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
 
@@ -722,7 +733,7 @@ def stat_tile(
         else ""
     )
     delta_html = f'<div class="sw-tile-delta">{delta}</div>' if delta else ""
-    st.markdown(
+    _md(
         f"""
         <div class="sw-tile sw-spot{border}"
              style="--d:{delay_ms}ms;--tile-c:{color}59;--fs:{size};">
@@ -732,7 +743,6 @@ def stat_tile(
           {delta_html}
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
 
@@ -764,7 +774,7 @@ def progress_ring(
         if label
         else ""
     )
-    st.markdown(
+    _md(
         f"""
         <div style="display:flex;flex-direction:column;align-items:center;gap:7px;
                     animation:sw-fade-up .6s var(--ease) both;">
@@ -779,7 +789,6 @@ def progress_ring(
           {label_html}
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
 
@@ -789,29 +798,41 @@ def pulsing_bars(
     color: str = "#3B82F6",
     height: str = "44px",
     max_period_ms: int = 900,
+    baseline: float = 34.0,
 ) -> None:
     """Animated bar stack (21st.dev ``PulsingBars``).
 
     Parameters
     ----------
     values:
-        Bar magnitudes; normalised to the maximum internally.
+        Bar magnitudes.  Heights map to ``[baseline, 100] %`` of *height*
+        so a nearly-flat series (e.g. a slowly drifting SHI) still shows
+        its relative shape instead of collapsing into a row of identical
+        full-height bars.
+    color:
+        Bar gradient colour.
+    height:
+        CSS height of the stack.
+    max_period_ms:
+        Pulse stagger window in milliseconds.
+    baseline:
+        Lowest bar height as a percentage (0 = flat data renders empty).
     """
     if not values:
         return
-    top = max(abs(float(v)) for v in values) or 1.0
+    vals = [abs(float(v)) for v in values]
+    lo, hi = min(vals), max(vals)
+    span = hi - lo
+    span = span if span > 1e-12 else 1.0
     bars = []
-    for i, v in enumerate(values):
-        h = 100.0 * abs(float(v)) / top
+    for i, v in enumerate(vals):
+        pct = baseline + (100.0 - baseline) * ((v - lo) / span)
         delay = int(max_period_ms * (i % 7) / 7)
         bars.append(
-            f'<div class="sw-bar" style="--bh:{h:.1f}%;--bd:{delay}ms;'
+            f'<div class="sw-bar" style="--bh:{pct:.1f}%;--bd:{delay}ms;'
             f'--bar-c:{color};"></div>'
         )
-    st.markdown(
-        f'<div class="sw-bars" style="--h:{height};">{"".join(bars)}</div>',
-        unsafe_allow_html=True,
-    )
+    _md(f'<div class="sw-bars" style="--h:{height};">{"".join(bars)}</div>')
 
 
 def sparkline(
@@ -841,7 +862,7 @@ def sparkline(
         math.dist((pts[i][0], pts[i][1]), (pts[i + 1][0], pts[i + 1][1]))
         for i in range(len(pts) - 1)
     ) + 1)
-    st.markdown(
+    _md(
         f"""
         <svg class="sw-spark" viewBox="0 0 {width} {height}" width="100%"
              height="{height}" preserveAspectRatio="none" aria-hidden="true">
@@ -858,7 +879,6 @@ def sparkline(
                   style="--sp-c:{color};"/>
         </svg>
         """,
-        unsafe_allow_html=True,
     )
 
 
@@ -880,10 +900,9 @@ def ticker(items: list[tuple[str, Any]], *, speed: str = "26s") -> None:
             f'<span class="sw-sep">◆</span>'
         )
     track = "".join(cells)
-    st.markdown(
+    _md(
         f'<div class="sw-marquee" style="--speed:{speed};">'
         f'<div class="sw-track">{track}{track}</div></div>',
-        unsafe_allow_html=True,
     )
 
 
@@ -896,4 +915,4 @@ def step_list(steps: list[str], *, start_delay_ms: int = 0, stagger_ms: int = 90
             f'<div class="sw-step-idx">{i}</div>'
             f'<div class="sw-step-text">{text}</div></div>'
         )
-    st.markdown(f'<div class="sw-steps">{"".join(rows)}</div>', unsafe_allow_html=True)
+    _md(f'<div class="sw-steps">{"".join(rows)}</div>')
