@@ -22,6 +22,7 @@ from stattwin.dashboard.components.live import (
     slide_window,
     state_from_shi,
 )
+from stattwin.dashboard.components.motion import progress_ring
 
 
 def _state_changes(timestamps: list, states: list) -> list[dict]:
@@ -146,7 +147,15 @@ def render() -> None:
             )
         )
         state = state_from_shi(shi_live)
-        c1, c2, c3 = st.columns(3)
+        ring_col, c1, c2, c3 = st.columns([1, 1, 1, 1])
+        with ring_col:
+            progress_ring(
+                shi_live * 100.0,
+                label="health index",
+                value_text=f"{shi_live:.3f}",
+                color="#10B981" if shi_live < 0.4 else "#F59E0B",
+                size="104px",
+            )
         with c1:
             st.markdown(
                 f"<div class='st-kpi' style='text-align:center;'>"

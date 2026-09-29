@@ -24,6 +24,7 @@ from stattwin.dashboard.components.live import (
     rul_countdown,
     state_from_shi,
 )
+from stattwin.dashboard.components.motion import step_list
 
 
 def _simulate(sensors: dict, adjustments: dict) -> dict:
@@ -67,6 +68,20 @@ def render() -> None:
 
     disclaimer_banner(
         "SIMULATION — not real operational data. Results are approximate proxies."
+    )
+
+    # Motion-slides style flow for the counterfactual pipeline
+    step_list(
+        [
+            "Load the observed baseline window for this machine",
+            "Apply your sensor adjustments (sliders below)",
+            "Re-run the statistical health + forecast pipeline on the "
+            "counterfactual series",
+            "Compare original vs simulated curves and review the labelled "
+            "<b>SIMULATION</b> deltas",
+        ],
+        start_delay_ms=0,
+        stagger_ms=110,
     )
 
     sensor_data = _load("sensor_data.json", machine)

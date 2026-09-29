@@ -1,20 +1,20 @@
 {
-  "dataset": "FD004",
+  "dataset": "FD001",
   "normalization_comparison": {
     "without_normalization": {
-      "mean_roc_auc_h30": 0.983535769833565,
-      "std_roc_auc_h30": 0.002680230279964617,
-      "mean_rul_rmse": 115.60318607713243,
-      "std_rul_rmse": 6.002880360943685,
+      "mean_roc_auc_h30": 0.9455550325563588,
+      "std_roc_auc_h30": 0.022807948630147814,
+      "mean_rul_rmse": 49.547407243422676,
+      "std_rul_rmse": 0.4949275071488912,
       "n_folds": 3
     },
     "with_normalization": {
-      "mean_roc_auc_h30": 0.9787041625873472,
-      "std_roc_auc_h30": 0.0018619596247296515,
-      "mean_rul_rmse": 115.60318607713243,
-      "std_rul_rmse": 6.002880360943685,
+      "mean_roc_auc_h30": 0.9460150973219399,
+      "std_roc_auc_h30": 0.021966927517263358,
+      "mean_rul_rmse": 49.547407243422676,
+      "std_rul_rmse": 0.4949275071488912,
       "n_folds": 3
     },
-    "elapsed_seconds": 56.82995630000005
+    "elapsed_seconds": 82.98523419999992
   }
 }

@@ -1,0 +1,11 @@
+  Running OOF calibration analysis...
+    Mean Brier: 0.038046726507219394
+  Running conformal interval analysis...
+    Coverage (test PICP): 0.9703086148895714
+    Mean width: 66.53600745110793
+    RUL MAE (test): 9.016336351724611
+
+[e5] Completed in 51.5s
+     Mean Brier: 0.038046726507219394
+     Conformal coverage: 0.9703086148895714
+     Output: C:\Users\AIML-DL-18\Desktop\AIML - 99\SMLD ML MODEL\stat-twin\results\e5_uncertainty

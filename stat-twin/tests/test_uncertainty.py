@@ -74,9 +74,36 @@ class TestConformalIntervals:
         rul_test = np.linspace(0, 100, len(y_test_pred))
         report = conformal_intervals(
             y_cal_true, y_cal_pred, sigma_cal,
-            y_test_pred, sigma_test, alpha=0.10, rul_test=rul_test,
+            y_test_pred, sigma_test, alpha=0.10,
+            rul_test=rul_test, y_test=y_test_true,
         )
         assert len(report.coverage_by_rul_bucket) > 0
+
+    def test_conformal_buckets_need_test_labels(self, synthetic_data):
+        """Without held-out test labels there is no honest per-row coverage."""
+        y_cal_true, y_cal_pred, sigma_cal, y_test_true, y_test_pred, sigma_test = synthetic_data
+        rul_test = np.linspace(0, 100, len(y_test_pred))
+        report = conformal_intervals(
+            y_cal_true, y_cal_pred, sigma_cal,
+            y_test_pred, sigma_test, alpha=0.10, rul_test=rul_test,
+        )
+        assert report.coverage_by_rul_bucket == {}
+
+    def test_conformal_test_coverage_is_honest(self, synthetic_data):
+        """With y_test supplied, coverage is measured on held-out rows."""
+        y_cal_true, y_cal_pred, sigma_cal, y_test_true, y_test_pred, sigma_test = synthetic_data
+        report = conformal_intervals(
+            y_cal_true, y_cal_pred, sigma_cal,
+            y_test_pred, sigma_test, alpha=0.10, y_test=y_test_true,
+        )
+        lo = report.intervals["lower"].to_numpy()
+        hi = report.intervals["upper"].to_numpy()
+        expected = float(np.mean((y_test_true >= lo) & (y_test_true <= hi)))
+        assert report.coverage == pytest.approx(expected, abs=1e-9)
+        # Winkler must be the real interval score, not the score proxy
+        assert report.winkler == pytest.approx(
+            winkler_score(y_test_true, lo, hi, 0.10), abs=1e-9
+        )
 
 
 class TestWinklerScore:

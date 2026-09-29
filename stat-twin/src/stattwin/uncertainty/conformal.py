@@ -89,23 +89,27 @@ def conformal_intervals(
     alpha: float = 0.10,
     eps: float = 1e-8,
     rul_test: np.ndarray | None = None,
+    y_test: np.ndarray | None = None,
 ) -> ConformalReport:
     """Build split-conformal prediction intervals on the test set.
 
     Parameters
     ----------
     y_cal, yhat_cal, sigma_cal:
-        True values, predictions, and ensemble std-dev on the **calibration**
-        set.
+        True values, predictions, and spread proxy on the **calibration**
+        set (never on the test set — that would leak).
     yhat_test, sigma_test:
-        Predictions and ensemble std-dev on the **test** set.
+        Predictions and spread proxy on the **test** set.
     alpha:
         Miscoverage level (0.10 → 90 % nominal coverage).
     eps:
         Small constant to avoid division by zero in normalisation.
     rul_test:
-        Optional true RUL for the test set, used to compute coverage by
-        RUL bucket.
+        Optional true RUL used only to bucket the coverage report.
+    y_test:
+        Optional true values for the test set.  When supplied, coverage
+        and the Winkler score are measured **honestly on held-out data**
+        instead of being read off the calibration scores.
 
     Returns
     -------
@@ -129,30 +133,29 @@ def conformal_intervals(
     width = upper - lower
     mean_width = float(np.mean(width))
 
-    # Coverage (PICP) – only computable if true values are available
-    coverage = np.nan
-    winkler_val = np.nan
+    # Coverage by RUL bucket / honest test metrics
     coverage_by_rul_bucket: dict[str, float] = {}
 
-    # For RUL-based metrics we need true y
-    # We'll use yhat_test + random residuals as proxy if y_true is missing,
-    # but the caller should provide y_cal which IS the true values.
-    # Here we compute coverage on calibration residuals as a proxy.
-    covered_cal = (scores_cal <= q).astype(float)
-    coverage = float(np.mean(covered_cal))
+    if y_test is not None:
+        y_test = np.asarray(y_test, dtype=float)
+        covered_test = (y_test >= lower) & (y_test <= upper)
+        coverage = float(np.mean(covered_test))
+        winkler_val = winkler_score(y_test, lower, upper, alpha)
 
-    # Winkler score on calibration (proxy; true Winkler needs test y)
-    winkler_val = _winkler_from_scores(scores_cal, q, alpha)
-
-    # Coverage by RUL bucket
-    if rul_test is not None:
-        quartiles = np.percentile(rul_test, [25, 50, 75])
-        bucket_names = ["Q1_low", "Q2_mid-low", "Q3_mid-high", "Q4_high"]
-        bucket_edges = np.concatenate([[0], quartiles, [np.inf]])
-        for i, name in enumerate(bucket_names):
-            mask = (rul_test >= bucket_edges[i]) & (rul_test < bucket_edges[i + 1])
-            if mask.sum() > 0:
-                coverage_by_rul_bucket[name] = float(np.mean(covered_cal[mask] if len(covered_cal) == len(mask) else np.nan))  # noqa: E501
+        if rul_test is not None:
+            bucket_of = np.asarray(rul_test, dtype=float)
+            quartiles = np.percentile(bucket_of, [25, 50, 75])
+            edges = np.concatenate([[-np.inf], quartiles, [np.inf]])
+            names = ["Q1_low", "Q2_mid-low", "Q3_mid-high", "Q4_high"]
+            for i, name in enumerate(names):
+                mask = (bucket_of >= edges[i]) & (bucket_of < edges[i + 1])
+                if mask.sum() > 0:
+                    coverage_by_rul_bucket[name] = float(np.mean(covered_test[mask]))
+    else:
+        # Fallback: report the in-sample calibration coverage, which is
+        # ~ (1 - alpha) by construction and therefore NOT a test PICP.
+        coverage = float(np.mean(scores_cal <= q))
+        winkler_val = _winkler_from_scores(scores_cal, q, alpha)
 
     intervals_df = pd.DataFrame(
         {"lower": lower, "upper": upper, "width": width},

@@ -1,0 +1,6 @@
+  Comparing with/without per-condition normalization...
+    Without norm: ROC-AUC=0.9456, RMSE=49.55
+    With norm:    ROC-AUC=0.9460, RMSE=49.55
+
+[e7] Completed in 83.3s
+     Output: C:\Users\AIML-DL-18\Desktop\AIML - 99\SMLD ML MODEL\stat-twin\results\e7_operating_conditions

@@ -1,11 +1,11 @@
 {
-  "timestamp": "2026-09-24T05:21:23.178352+00:00",
-  "git_hash": "d4f136d",
+  "timestamp": "2026-09-29T03:27:15.225551+00:00",
+  "git_hash": "2af8beb",
   "git_dirty": true,
   "config_file": "C:\\Users\\AIML-DL-18\\Desktop\\AIML - 99\\SMLD ML MODEL\\stat-twin\\configs\\base.yaml",
   "config_hash": "439e9e7b699d",
   "seed": 42,
-  "dataset": "FD004",
+  "dataset": "FD001",
   "profile": null,
   "python": "3.12.5",
   "platform": "Windows 11",
@@ -27,7 +27,7 @@
   "config": {
     "seed": 42,
     "dataset": {
-      "name": "FD004",
+      "name": "FD001",
       "raw_dir": "data/raw/CMAPSS",
       "rul_clip": 125,
       "use_age_feature": false
@@ -117,7 +117,16 @@
         "hidden": 64,
         "layers": 2,
         "dropout": 0.2,
-        "ensemble_size": 3
+        "ensemble_size": 3,
+        "seq_len": 30,
+        "lr": 0.001,
+        "batch_size": 64,
+        "epochs": 50,
+        "patience": 8,
+        "weight_decay": 1e-05,
+        "horizon_weight": 1.0,
+        "normalize_features": true,
+        "val_fraction": 0.15
       },
       "xgb": {
         "n_estimators": 400,
@@ -137,12 +146,23 @@
         "layers": 2,
         "dropout": 0.2,
         "ensemble_size": 3
+      },
+      "ensemble": {
+        "members": [
+          "logistic",
+          "random_forest",
+          "xgboost"
+        ],
+        "weights": "learned",
+        "val_fraction": 0.2
       }
     },
     "uncertainty": {
       "method": "split_conformal",
       "alpha": 0.1,
-      "normalize_by": "ensemble_std"
+      "normalize_by": "ensemble_std",
+      "n_ensemble_members": 5,
+      "n_bootstraps": 30
     },
     "calibration": {
       "method": "isotonic",
@@ -155,6 +175,6 @@
       "far_budget": 0.05
     }
   },
-  "elapsed_seconds": 57.03756160000012,
+  "elapsed_seconds": 83.25932130000001,
   "experiment": "e7_operating_conditions"
 }

@@ -1,6 +1,7 @@
 """STAT-TWIN multipage Streamlit dashboard — industrial dark control-room UI."""
 from __future__ import annotations
 
+import contextlib
 import importlib
 import json
 import re
@@ -166,7 +167,7 @@ st.markdown(
 )
 
 # ── Telemetry ticker ribbon ─────────────────────────────────────────────────
-try:
+with contextlib.suppress(Exception):  # decorative only
     from stattwin.dashboard.components.motion import ticker as _ticker
 
     _ticker(
@@ -180,8 +181,115 @@ try:
         ],
         speed="34s",
     )
-except Exception:  # pragma: no cover - decorative only
-    pass
+
+# ── Animated status strip (count-up + rings; NOT inside a live fragment) ───
+def _status_strip(machine: str) -> None:
+    """Bento strip of headline metrics with count-up numerals.
+
+    Rendered in the app shell (not a fragment) so the count-up animation
+    plays on navigation instead of flickering every 2 s.  Every number
+    comes from artifacts in ``results/`` — nothing is invented.
+    """
+    from stattwin.dashboard.components.artifacts import load_artifact
+    from stattwin.dashboard.components.motion import (
+        progress_ring,
+        pulsing_bars,
+        stat_tile,
+    )
+
+    health = load_artifact("health_summary.json", machine) or {}
+    forecast = load_artifact("failure_forecast.json", machine) or {}
+    timeline = load_artifact("shi_timeline.json", machine) or {}
+    prov = "OBSERVED" if health else "SIMULATED"
+
+    def _f(d: dict, key: str, default: float) -> float:
+        try:
+            return float(d.get(key, default))
+        except (TypeError, ValueError):
+            return default
+
+    shi = _f(health, "shi", 0.0)
+    fp30 = _f(forecast, "failure_prob_30", 0.0)
+    rul = _f(forecast, "rul", 0.0)
+    shi_series = [
+        float(v) for v in (timeline.get("shi") or [])[-28:] if v is not None
+    ]
+
+    c0, c1, c2, c3 = st.columns([1, 1, 1, 1.05])
+    with c0:
+        stat_tile(
+            f'SHI · {prov}',
+            _count(0.0, shi, 3),
+            delta="statistical health index",
+            color="#10B981" if shi < 0.4 else "#F59E0B",
+            delay_ms=0,
+        )
+    with c1:
+        stat_tile(
+            "P(fail ≤ 30 cyc)",
+            _count(0.0, fp30, 1, suffix="%", scale=100.0),
+            delta="model probability",
+            color="#F59E0B",
+            delay_ms=70,
+        )
+    with c2:
+        stat_tile(
+            "RUL (cycles)",
+            _count(0.0, rul, 1),
+            delta="remaining useful life",
+            color="#3B82F6",
+            delay_ms=140,
+        )
+    with c3:
+        ring_col, ring_left, ring_right = st.columns([1, 1.35, 1])
+        with ring_col:
+            progress_ring(
+                shi * 100.0,
+                label="health",
+                value_text=f"{shi:.2f}",
+                color="#10B981" if shi < 0.4 else "#F59E0B",
+                size="92px",
+            )
+        with ring_left:
+            if shi_series:
+                st.markdown(
+                    '<div class="sw-tile-label" style="margin-bottom:6px;">'
+                    "SHI recent trajectory</div>",
+                    unsafe_allow_html=True,
+                )
+                pulsing_bars(
+                    shi_series,
+                    color="#3B82F6",
+                    height="42px",
+                )
+            else:
+                st.markdown(
+                    '<div style="color:#6B7280;font-size:.72rem;'
+                    'font-family:\'JetBrains Mono\',monospace;">'
+                    "no SHI timeline artifact</div>",
+                    unsafe_allow_html=True,
+                )
+        with ring_right:
+            st.markdown(
+                '<div class="sw-tile" style="--d:210ms;padding:12px 14px;">'
+                '<div class="sw-tile-label">artifacts</div>'
+                f'<div class="sw-tile-value" style="font-size:1.35rem;">{n_results}</div>'
+                '<div class="sw-tile-delta">result sets linked</div></div>',
+                unsafe_allow_html=True,
+            )
+
+
+def _count(base: float, value: float, decimals: int, *, suffix: str = "",
+           scale: float = 1.0) -> str:
+    """Count-up HTML for a real artifact value (0.0 when absent)."""
+    from stattwin.dashboard.components.motion import count_up_html
+
+    shown = base if value == 0.0 else value * scale
+    return count_up_html(shown, decimals=decimals, suffix=suffix)
+
+
+with contextlib.suppress(Exception):  # decorative only
+    _status_strip(selected_machine)
 
 # ── Dispatch to page module (absolute imports: stattwin.dashboard.views.*) ───
 page_module_path = PAGES[selected_page]

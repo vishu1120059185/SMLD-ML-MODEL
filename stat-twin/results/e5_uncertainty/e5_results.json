@@ -342,20 +342,23 @@
     "mean_brier": 0.038046726507219394,
     "mean_ece_ew": 0.033697081108323715,
     "n_folds_used": 3,
-    "elapsed_seconds": 36.88012220000007
+    "elapsed_seconds": 40.234446100000014
   },
   "conformal": {
     "alpha": 0.1,
-    "quantile_q": 131.99999868000003,
-    "coverage": 0.9002443582003737,
-    "mean_width": 192.0,
-    "winkler": 16701.822865618564,
+    "quantile_q": 34.6563869825377,
+    "coverage": 0.9703086148895714,
+    "mean_width": 66.53600745110793,
+    "winkler": 70.62005533521001,
+    "rul_mae_test": 9.016336351724611,
+    "n_cal_rows": 6957,
+    "n_test_rows": 13674,
     "coverage_by_rul_bucket": {
-      "Q1_low": NaN,
-      "Q2_mid-low": NaN,
-      "Q3_mid-high": NaN,
-      "Q4_high": NaN
+      "Q1_low": 0.9747474747474747,
+      "Q2_mid-low": 0.9324009324009324,
+      "Q3_mid-high": 0.9703856749311295,
+      "Q4_high": 0.991519174041298
     },
-    "elapsed_seconds": 6.853261400000065
+    "elapsed_seconds": 10.32546810000008
   }
 }

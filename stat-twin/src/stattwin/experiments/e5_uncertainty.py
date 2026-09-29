@@ -71,7 +71,10 @@ def _oof_uncertainty(
 
         m = copy.deepcopy(model)
         try:
-            m.fit(X_tr[feature_cols + ["unit_id", "cycle"]], y_tr)
+            fit_cols = feature_cols + ["unit_id", "cycle"]
+            if "RUL" in X_tr.columns:
+                fit_cols = fit_cols + ["RUL"]
+            m.fit(X_tr[fit_cols], y_tr)
             proba = m.predict_proba(X_val[feature_cols + ["unit_id", "cycle"]])
         except Exception as e:
             print(f"    Fold {fold_idx} failed: {e}")
@@ -136,7 +139,13 @@ def _conformal_analysis(
     feature_cols: list[str],
     alpha: float = 0.10,
 ) -> dict[str, Any]:
-    """Split-conformal analysis with calibration/test split."""
+    """Split-conformal analysis with a unit-disjoint calibration/test split.
+
+    The model is fitted **with** the RUL column so it trains a real RUL
+    regressor — without it ``predict_rul`` falls back to a constant, which
+    makes every conformal interval uselessly wide.  Coverage and the
+    Winkler score are measured on the held-out test units.
+    """
     # Use first fold for calibration, rest for test
     if not splits:
         return {"error": "no splits"}
@@ -148,21 +157,26 @@ def _conformal_analysis(
     X_test = X[X["unit_id"].isin(test_units)].copy()
 
     m_cal = copy.deepcopy(model)
-    copy.deepcopy(model)
 
     try:
         # Fit on training portion of first split
         X_tr = X[X["unit_id"].isin(cal_split["train_units"])].copy()
         y_tr = y.loc[X_tr.index]
-        m_cal.fit(X_tr[feature_cols + ["unit_id", "cycle"]], y_tr)
+        fit_cols = feature_cols + ["unit_id", "cycle"]
+        if "RUL" in X_tr.columns:
+            fit_cols = fit_cols + ["RUL"]
+        m_cal.fit(X_tr[fit_cols], y_tr)
 
+        pred_cols = feature_cols + ["unit_id", "cycle"]
         # Calibration predictions
-        rul_cal = m_cal.predict_rul(X_cal[feature_cols + ["unit_id", "cycle"]])
-        rul_test = m_cal.predict_rul(X_test[feature_cols + ["unit_id", "cycle"]])
+        rul_cal = m_cal.predict_rul(X_cal[pred_cols])
+        rul_test = m_cal.predict_rul(X_test[pred_cols])
 
-        # Ensemble std (use raw score variance as proxy)
-        sigma_cal = np.abs(rul_cal.values - rul_cal.values.mean()) + 1.0
-        sigma_test = np.abs(rul_test.values - rul_test.values.mean()) + 1.0
+        # Nonconformity denominator: a constant scale makes the scores
+        # plain absolute residuals, which calibrates best for RUL
+        # (verified in tests/test_enhancements.py::test_conformal_*).
+        sigma_cal = np.ones(len(rul_cal), dtype=float)
+        sigma_test = np.ones(len(rul_test), dtype=float)
 
         rul_cal_true = X_cal["RUL"].values if "RUL" in X_cal.columns else rul_cal.values
         rul_test_true = X_test["RUL"].values if "RUL" in X_test.columns else rul_test.values
@@ -170,11 +184,12 @@ def _conformal_analysis(
         report = conformal_intervals(
             y_cal=rul_cal_true.astype(float),
             yhat_cal=rul_cal.values.astype(float),
-            sigma_cal=sigma_cal.astype(float),
+            sigma_cal=sigma_cal,
             yhat_test=rul_test.values.astype(float),
-            sigma_test=sigma_test.astype(float),
+            sigma_test=sigma_test,
             alpha=alpha,
             rul_test=rul_test_true.astype(float) if rul_test_true is not None else None,
+            y_test=rul_test_true.astype(float) if rul_test_true is not None else None,
         )
 
         return {
@@ -183,6 +198,11 @@ def _conformal_analysis(
             "coverage": report.coverage,
             "mean_width": report.mean_width,
             "winkler": report.winkler,
+            "rul_mae_test": float(
+                np.mean(np.abs(rul_test.values.astype(float) - rul_test_true))
+            ),
+            "n_cal_rows": int(len(rul_cal)),
+            "n_test_rows": int(len(rul_test)),
             "coverage_by_rul_bucket": report.coverage_by_rul_bucket,
         }
     except Exception as e:
@@ -281,7 +301,12 @@ def run_e5(cfg, df, out_dir) -> dict[str, Any]:
     label_cols = [label_col_for(h) for h in FAILURE_HORIZONS]
     y = df[label_cols].copy()
 
-    model = XGBoostModel(horizons=FAILURE_HORIZONS)
+    model = XGBoostModel(
+        n_estimators=cfg.model.xgb.n_estimators,
+        max_depth=cfg.model.xgb.max_depth,
+        learning_rate=cfg.model.xgb.learning_rate,
+        horizons=FAILURE_HORIZONS,
+    )
 
     # Calibration analysis
     print("  Running OOF calibration analysis...")
@@ -296,7 +321,9 @@ def run_e5(cfg, df, out_dir) -> dict[str, Any]:
         conformal = _conformal_analysis(model, df, y, splits, feature_cols,
                                         alpha=cfg.uncertainty.alpha)
     conformal["elapsed_seconds"] = t.elapsed
-    print(f"    Coverage: {conformal.get('coverage', 'N/A')}")
+    print(f"    Coverage (test PICP): {conformal.get('coverage', 'N/A')}")
+    print(f"    Mean width: {conformal.get('mean_width', 'N/A')}")
+    print(f"    RUL MAE (test): {conformal.get('rul_mae_test', 'N/A')}")
 
     results: dict[str, Any] = {
         "dataset": cfg.dataset.name,

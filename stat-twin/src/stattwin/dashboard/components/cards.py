@@ -163,12 +163,13 @@ def kpi_card(
     delta_color: str = "normal",
     provenance: str | None = None,
     tooltip: str | None = None,
-    animate: bool = True,
+    animate: bool = False,
 ):
     """Render a KPI metric card with optional tooltip and provenance.
 
-    Plain numeric values animate with a count-up numeral; pass
-    ``animate=False`` to keep a static (or non-numeric) string.
+    ``animate=True`` turns a plain numeric value into a count-up numeral.
+    It defaults to *off* because KPI cards live inside 2 s live fragments
+    where a re-triggered count-up reads as flicker, not motion.
     """
     prov_html = f" {provenance_badge(provenance)}" if provenance else ""
     label_html = _tooltip(label) if tooltip else label
