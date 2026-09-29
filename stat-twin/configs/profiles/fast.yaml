@@ -15,7 +15,11 @@ model:
     hidden: 64
     layers: 2
     dropout: 0.2
-    ensemble_size: 3
+    # fast profile = development loop: a single GRU seed keeps the neural
+    # models in the low minutes instead of ~90.  `full` keeps 5 seeds.
+    ensemble_size: 1
+    epochs: 25
+    patience: 5
   xgb:
     n_estimators: 400
     max_depth: 5
@@ -30,4 +34,13 @@ model:
     hidden: 64
     layers: 2
     dropout: 0.2
-    ensemble_size: 3
+    ensemble_size: 1
+  ensemble:
+    members: [logistic, random_forest, xgboost]
+    weights: learned
+    val_fraction: 0.2
+  feature_screen:
+    enabled: true
+    top_k: 300
+    method: correlation
+    min_keep: 30

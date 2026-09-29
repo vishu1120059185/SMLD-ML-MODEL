@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -172,6 +173,109 @@ def feature_columns(df: pd.DataFrame, include_health: bool = True) -> list[str]:
     if not include_health:
         cols = [c for c in cols if "shi" not in c.lower() and "evidence_" not in c.lower()]
     return cols
+
+
+# ---------------------------------------------------------------------------
+# Feature hygiene + screening
+# ---------------------------------------------------------------------------
+
+def impute_causal(
+    frames: list[pd.DataFrame],
+    feature_cols: list[str],
+    unit_col: str = "unit_id",
+) -> None:
+    """Fill missing feature values **in place**, causally and train-only.
+
+    Applied to every frame in *frames* in the given order — the first
+    frame **must be the training portion**:
+
+    1. forward-fill within each unit — uses only rows ``<= t``, so a
+       leading ``NaN`` (no history yet) stays ``NaN`` while interior gaps
+       inherit the previous cycle of the *same* unit;
+    2. fill whatever remains with the column median of the
+       **forward-filled training frame** (never validation rows), falling
+       back to ``0.0`` for an all-missing column.
+
+    The engineered library leaves ``NaN`` in the leading cycles of a unit
+    (rolling / correlation windows have no history yet) — 1 029 of 1 117
+    columns on FD001.  Tree models tolerate ``NaN``, but linear models and
+    the ensemble weight search do not, so this must run before any fit.
+    """
+    present = [c for c in feature_cols if len(frames) and c in frames[0].columns]
+    if not present:
+        return
+    for frame in frames:
+        if unit_col in frame.columns:
+            frame[present] = frame.groupby(unit_col, sort=False)[present].ffill()
+    medians = frames[0][present].median(numeric_only=True).fillna(0.0)
+    for frame in frames:
+        frame[present] = frame[present].fillna(medians)
+
+
+def screen_features(
+    X_train: pd.DataFrame,
+    y_train: pd.DataFrame,
+    feature_cols: list[str],
+    *,
+    top_k: int = 300,
+    min_keep: int = 30,
+) -> list[str]:
+    """Return the ``top_k`` most target-associated columns (train-only).
+
+    Score = max(|corr| with RUL, mean |corr| across failure horizons),
+    computed with vectorised Pearson correlation on the **training units
+    only**, so validation units never influence the selection.  Raw sensor
+    columns are always retained — they are the physical signal, and they
+    are cheap to keep.
+    """
+    present = [c for c in feature_cols if c in X_train.columns]
+    if top_k <= 0 or len(present) <= top_k:
+        return feature_cols
+
+    block = X_train[present]
+    scores = pd.Series(0.0, index=present)
+
+    targets: list[pd.Series] = []
+    if "RUL" in X_train.columns:
+        targets.append(X_train["RUL"].astype(float))
+    for col in y_train.columns:
+        if col in X_train.columns or col in y_train.columns:
+            targets.append(y_train[col].reindex(block.index).astype(float))
+
+    for target in targets:
+        if target.isna().all():
+            continue
+        with warnings.catch_warnings():
+            # constant columns give a 0/0 correlation; they are simply
+            # uninformative and must not raise or pollute the ranking
+            warnings.simplefilter("ignore", RuntimeWarning)
+            corr = block.corrwith(target)
+        scores = scores.combine(corr.abs().fillna(0.0), max)
+
+    raw = [c for c in present if c.startswith("sensor_") or c.startswith("op_setting_")]
+    ranked = [c for c in scores.sort_values(ascending=False).index if c not in raw]
+    keep = raw + ranked[: max(top_k - len(raw), min_keep)]
+    keep = [c for c in present if c in set(keep)]
+    return keep[: max(top_k, min_keep)]
+
+
+def resolve_feature_cols(
+    cfg,
+    X_train: pd.DataFrame,
+    y_train: pd.DataFrame,
+    feature_cols: list[str],
+) -> list[str]:
+    """Apply the configured per-fold screening policy."""
+    screen = cfg.model.feature_screen
+    if not screen.enabled or screen.method == "none" or screen.top_k <= 0:
+        return feature_cols
+    return screen_features(
+        X_train,
+        y_train,
+        feature_cols,
+        top_k=screen.top_k,
+        min_keep=screen.min_keep,
+    )
 
 
 def setup_output(experiment_name: str) -> Path:

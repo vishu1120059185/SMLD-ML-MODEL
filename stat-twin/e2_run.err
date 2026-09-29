@@ -64,3 +64,4 @@ C:\Users\AIML-DL-18\AppData\Roaming\Python\Python312\site-packages\sklearn\utils
   T = new_sum / new_sample_count
 C:\Users\AIML-DL-18\AppData\Roaming\Python\Python312\site-packages\sklearn\utils\extmath.py:1240: RuntimeWarning: invalid value encountered in divide
   new_unnormalized_variance -= correction**2 / new_sample_count
+^C

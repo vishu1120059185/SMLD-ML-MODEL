@@ -11,8 +11,8 @@
   },
   "rul": 73.0,
   "rul_ci": [
-    25.515314771497117,
-    120.48468522850288
+    44.87042304104095,
+    101.12957695895905
   ],
   "model": "empirical_rul_cdf (baseline)",
   "provenance": "PREDICTED"

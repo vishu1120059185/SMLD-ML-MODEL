@@ -104,12 +104,28 @@ def timeline_chart(
             "CRITICAL": "rgba(239,68,68,0.13)",
             "FAILURE-LIKELY": "rgba(153,27,27,0.15)",
         }
+        # Only label bands wide enough to hold text; a state that flips
+        # every few cycles otherwise renders as unreadable overlapping
+        # annotations.  Narrower bands are still shaded, and the state
+        # breakdown is exposed in the hover label of the SHI trace.
+        span = None
+        try:
+            first, last = state_changes[0]["start"], state_changes[-1]["end"]
+            span = float(last) - float(first)
+        except (TypeError, ValueError, IndexError, KeyError):
+            span = None
+        min_label_frac = 0.06
         for sc in state_changes:
+            try:
+                width = float(sc["end"]) - float(sc["start"])
+            except (TypeError, ValueError):
+                width = 0.0
+            wide_enough = span is not None and width >= min_label_frac * (span or 1.0)
             fig.add_vrect(
                 x0=sc["start"], x1=sc["end"],
                 fillcolor=fills.get(sc["state"], "rgba(0,0,0,0)"),
                 layer="below", line_width=0,
-                annotation_text=sc["state"],
+                annotation_text=sc["state"] if wide_enough else None,
                 annotation_position="top left",
                 annotation_font_size=9,
                 annotation_font_color=TEXT,

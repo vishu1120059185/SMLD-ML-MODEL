@@ -137,6 +137,14 @@ def render() -> None:
             annotation_position="right",
         )
         st.plotly_chart(fig, width="stretch", key=f"health_shi_{tick}")
+        if states:
+            occupancy = pd.Series(states).value_counts(normalize=True)
+            st.caption(
+                "State occupancy in window: "
+                + " · ".join(
+                    f"{name} {frac:.0%}" for name, frac in occupancy.items()
+                )
+            )
 
         shi_base = float(health.get("shi", float(np.mean(y)))) if health else float(np.mean(y))
         shi_live = float(

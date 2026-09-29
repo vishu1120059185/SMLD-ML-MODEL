@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import json
 import time
 from pathlib import Path
 from typing import Any
@@ -54,6 +55,8 @@ from ._common import (
     Timer,
     add_common_args,
     feature_columns,
+    impute_causal,
+    resolve_feature_cols,
     resolve_raw_path,
     save_json,
     sensor_columns,
@@ -202,9 +205,14 @@ def _fold_metrics(
 def _evaluate_single_model(
     model, X: pd.DataFrame, y: pd.DataFrame,
     splits: list[dict], feature_cols: list[str],
-    rul_series: pd.Series,
+    rul_series: pd.Series, cfg=None,
 ) -> dict[str, Any]:
-    """Run OOF evaluation for one model and return aggregated metrics."""
+    """Run OOF evaluation for one model and return aggregated metrics.
+
+    Per fold the feature set is screened on the **training units only**
+    and missing values are imputed causally (unit-wise forward fill, then
+    training medians), so neither step can see a validation unit.
+    """
     all_proba: list[pd.DataFrame] = []
     all_rul_pred: list[pd.Series] = []
     all_rul_true: list[pd.Series] = []
@@ -220,17 +228,23 @@ def _evaluate_single_model(
         y_tr = y.loc[X_tr.index]
         y_val = y.loc[X_val.index]
 
+        fold_cols = list(feature_cols)
+        if cfg is not None:
+            fold_cols = resolve_feature_cols(cfg, X_tr, y_tr, fold_cols)
+        if fold_cols:
+            impute_causal([X_tr, X_val], fold_cols)
+
         m = copy.deepcopy(model)
         try:
-            fit_cols = feature_cols + ["unit_id", "cycle"]
+            fit_cols = fold_cols + ["unit_id", "cycle"]
             if "RUL" in X_tr.columns:
                 fit_cols = fit_cols + ["RUL"]
             m.fit(X_tr[fit_cols], y_tr)
-            predict_frame = X_val[feature_cols + ["unit_id", "cycle"]]
+            predict_frame = X_val[fold_cols + ["unit_id", "cycle"]]
             proba = m.predict_proba(predict_frame)
             rul_pred = m.predict_rul(predict_frame)
         except Exception as e:
-            print(f"  Fold {fold_idx} failed for {model.name}: {e}")
+            print(f"  Fold {fold_idx} failed for {model.name}: {e}", flush=True)
             fold_reports.append({"fold": fold_idx, "error": str(e)})
             continue
 
@@ -239,6 +253,7 @@ def _evaluate_single_model(
             fold_idx, y_val, proba, rul_true, rul_pred,
             [int(u) for u in val_units],
         )
+        fold_entry["n_features"] = len(fold_cols)
         if isinstance(m, EnsembleModel):
             fold_entry["ensemble_weights"] = {
                 "prob": {k: round(v, 4) for k, v in m.prob_weights_.items()},
@@ -364,13 +379,52 @@ def _plot_rul_comparison(all_results: list[dict], out_dir: Path) -> None:
 # Feature engineering
 # ---------------------------------------------------------------------------
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _feature_cache_key(df: pd.DataFrame, cfg, sensor_cols: list[str]) -> str:
+    """Stable cache key: dataset, profile-relevant config, sensor list, size."""
+    import hashlib
+
+    payload = "|".join(
+        [
+            cfg.dataset.name,
+            str(cfg.dataset.rul_clip),
+            str(cfg.stats.model_dump()),
+            str(sorted(sensor_cols)),
+            str(df.shape),
+            str(int(pd.util.hash_pandas_object(df[["unit_id", "cycle"]], index=False).sum())),
+        ]
+    )
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]  # noqa: S324
+
+
 def _engineer_features(df: pd.DataFrame, cfg) -> pd.DataFrame:
     """Add the statistical feature library + SHI health columns.
 
     Only raw sensor columns are engineered so that label columns can
-    never leak into the feature set.
+    never leak into the feature set.  The result is cached under
+    ``artifacts/feature_cache/`` keyed by the dataset, config hash, and
+    source-file fingerprint, so repeated experiments skip the ~4 minutes
+    of windowed statistics instead of recomputing an identical frame.
     """
     cols = sensor_columns(df)
+    cache_dir = _PROJECT_ROOT / "artifacts" / "feature_cache"
+    key = _feature_cache_key(df, cfg, cols)
+    cache_path = cache_dir / f"{key}.parquet"
+    if cache_path.exists():
+        try:
+            cached = pd.read_parquet(cache_path)
+            if len(cached) == len(df):
+                print(
+                    f"    feature cache hit: {cache_path.name} "
+                    f"({cached.shape[1]} columns)",
+                    flush=True,
+                )
+                return cached
+        except Exception as exc:  # noqa: BLE001 - cache is best-effort
+            print(f"    feature cache unreadable ({exc}); recomputing", flush=True)
+
     t0 = time.time()
     out, _spec = compute_features(df, cfg, sensor_cols=cols)
     print(
@@ -396,6 +450,13 @@ def _engineer_features(df: pd.DataFrame, cfg) -> pd.DataFrame:
     except Exception as exc:  # noqa: BLE001 – health columns are optional
         print(f"    SHI skipped: {exc}", flush=True)
         out["shi_score"] = 50.0
+
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        out.to_parquet(cache_path, index=False)
+        print(f"    feature cache written: {cache_path.name}", flush=True)
+    except Exception as exc:  # noqa: BLE001 - cache is best-effort
+        print(f"    feature cache write skipped ({exc})", flush=True)
     return out
 
 
@@ -404,7 +465,7 @@ def _engineer_features(df: pd.DataFrame, cfg) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 def run_e2(
-    cfg, df, out_dir, features: str = "engineered"
+    cfg, df, out_dir, features: str = "engineered", resume: bool = True
 ) -> dict[str, Any]:
     """Run model comparison experiment.
 
@@ -421,6 +482,11 @@ def run_e2(
         library and feeds it to the tabular models.  ``"raw"`` restricts
         every model to raw sensor / operating-setting columns.
         GRU/LSTM/threshold models always receive raw sensor columns.
+    resume:
+        Reuse per-model results already present in a previous
+        ``e2_results.json`` written by the same configuration.  Results
+        are checkpointed after every model, so an interrupted run never
+        loses completed work.
     """
     raw_feature_cols = feature_columns(df, include_health=True)
 
@@ -437,27 +503,113 @@ def run_e2(
     # Build models
     models = _build_models(cfg)
 
-    all_results = []
+    screen = cfg.model.feature_screen
+    fingerprint = {
+        "dataset": cfg.dataset.name,
+        "features": features,
+        "n_splits": cfg.split.n_splits,
+        "seed": cfg.seed,
+        "feature_screen": screen.model_dump(),
+        "models": [m.name for m in models],
+        # hyperparameter signature: a config change must invalidate the
+        # resume cache, otherwise cached rows would be mixed with freshly
+        # computed rows from a different configuration
+        "model_signature": _model_signature(cfg),
+    }
+
+    all_results: list[dict[str, Any]] = []
+    done_names: set[str] = set()
+    if resume:
+        previous = _read_json(out_dir / "e2_results.json")
+        if (
+            isinstance(previous, dict)
+            and previous.get("feature_screen") == fingerprint["feature_screen"]
+            and previous.get("model_signature") == fingerprint["model_signature"]
+            and previous.get("features") == features
+            and previous.get("dataset") == cfg.dataset.name
+            and previous.get("n_splits") == cfg.split.n_splits
+            and isinstance(previous.get("models"), list)
+        ):
+            cached = {
+                str(m.get("model")): m
+                for m in previous["models"]
+                if isinstance(m, dict) and m.get("model")
+            }
+            reusable = {
+                name: row
+                for name, row in cached.items()
+                if "error" not in row and row.get("rul") is not None
+            }
+            if reusable:
+                print(
+                    f"  Resuming: reusing {len(reusable)} completed model(s) "
+                    f"from {out_dir / 'e2_results.json'}",
+                    flush=True,
+                )
+                all_results = list(reusable.values())
+                done_names = set(reusable)
+
     for model in models:
+        if model.name in done_names:
+            print(f"  Skipping {model.name} (already computed)", flush=True)
+            continue
         if isinstance(model, _RAW_ONLY_TYPES):
             cols, kind = raw_feature_cols, "raw"
         elif features == "engineered":
             cols, kind = eng_feature_cols, "engineered"
         else:
             cols, kind = raw_feature_cols, "raw"
-        print(f"  Evaluating {model.name} ({kind}, {len(cols)} features)...")
+        print(f"  Evaluating {model.name} ({kind}, {len(cols)} features)...", flush=True)
         with Timer() as t:
             result = _evaluate_single_model(
-                model, df_feat, y, splits, cols, df_feat["RUL"]
+                model, df_feat, y, splits, cols, df_feat["RUL"], cfg=cfg
             )
         result["elapsed_seconds"] = t.elapsed
         result["features"] = {"kind": kind, "n_features": len(cols)}
         all_results.append(result)
-        print(f"    Done in {t.elapsed:.1f}s")
+        print(f"    Done in {t.elapsed:.1f}s", flush=True)
+        # checkpoint after every model so an interrupt loses nothing
+        _save_results(cfg, out_dir, fingerprint, all_results, partial=True)
 
-    # Summary table
+    results: dict[str, Any] = _build_results(
+        cfg, fingerprint, all_results, partial=False
+    )
+
+    save_json(results, out_dir / "e2_results.json")
+    _plot_roc_comparison(all_results, out_dir)
+    _plot_rul_comparison(all_results, out_dir)
+
+    return results
+
+
+def _read_json(path: Path) -> dict | list | None:
+    """Read a JSON file, returning ``None`` when missing or malformed."""
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _model_signature(cfg) -> dict[str, Any]:
+    """Hyperparameters that must match for cached model rows to be reusable."""
+    return {
+        "lr": cfg.model.lr.model_dump(),
+        "rf": cfg.model.rf.model_dump(),
+        "xgb": cfg.model.xgb.model_dump(),
+        "gru": cfg.model.gru.model_dump(),
+        "lstm": cfg.model.lstm.model_dump(),
+        "ensemble": cfg.model.ensemble.model_dump(),
+    }
+
+
+def _build_results(
+    cfg, fingerprint: dict[str, Any], models: list[dict[str, Any]], *, partial: bool
+) -> dict[str, Any]:
+    """Assemble the e2 payload (with the summary table) from model rows."""
     summary_rows = []
-    for r in all_results:
+    for r in models:
         if "error" in r:
             summary_rows.append({"model": r["model"], "error": r["error"]})
             continue
@@ -470,19 +622,31 @@ def run_e2(
         row["nasa_score"] = r["rul"]["nasa_score"]
         summary_rows.append(row)
 
-    results: dict[str, Any] = {
+    return {
         "dataset": cfg.dataset.name,
-        "features": features,
+        "features": fingerprint["features"],
         "n_splits": cfg.split.n_splits,
-        "models": all_results,
+        "feature_screen": fingerprint["feature_screen"],
+        "model_signature": fingerprint["model_signature"],
+        "partial": partial,
+        "models": models,
         "summary_table": summary_rows,
     }
 
-    save_json(results, out_dir / "e2_results.json")
-    _plot_roc_comparison(all_results, out_dir)
-    _plot_rul_comparison(all_results, out_dir)
 
-    return results
+def _save_results(
+    cfg,
+    out_dir: Path,
+    fingerprint: dict[str, Any],
+    models: list[dict[str, Any]],
+    *,
+    partial: bool,
+) -> None:
+    """Checkpoint the results file after each completed model."""
+    save_json(
+        _build_results(cfg, fingerprint, models, partial=partial),
+        out_dir / "e2_results.json",
+    )
 
 
 def main() -> None:
@@ -503,6 +667,14 @@ def main() -> None:
             "feature library + SHI, default) or 'raw' sensors only."
         ),
     )
+    parser.add_argument(
+        "--no-resume",
+        action="store_true",
+        help=(
+            "Recompute every model even if a previous run with the same "
+            "configuration already stored its results."
+        ),
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config, profile=args.profile, dataset=args.ds)
@@ -514,7 +686,7 @@ def main() -> None:
     out_dir = setup_output("e2_model_comparison")
 
     with Timer() as t:
-        results = run_e2(cfg, df, out_dir, features=args.features)
+        results = run_e2(cfg, df, out_dir, features=args.features, resume=not args.no_resume)
 
     print(f"\n[e2] Completed in {t.elapsed:.1f}s")
     print(f"     Models evaluated: {len(results['models'])}")

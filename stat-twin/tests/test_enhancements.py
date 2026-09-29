@@ -324,6 +324,282 @@ class TestLogisticTail:
 
 
 # ---------------------------------------------------------------------------
+# Feature screening + causal imputation
+# ---------------------------------------------------------------------------
+
+
+class TestFeatureScreen:
+    @staticmethod
+    def _frame(n_units=30, n_cycles=100, n_noise=400, seed=0):
+        rng = np.random.default_rng(seed)
+        rows = []
+        for u in range(1, n_units + 1):
+            for c in range(1, n_cycles + 1):
+                rows.append({"unit_id": u, "cycle": c, "RUL": float(n_cycles - c)})
+        X = pd.DataFrame(rows)
+        rul = X["RUL"].to_numpy()
+        # build the noise block at once (avoids a fragmented frame)
+        noise = rng.normal(0, 1, (n_noise, len(rul)))
+        block = {
+            f"f{i}": (
+                (rul * 0.4 if i < 5 else 0.0) + noise[i]
+            )
+            for i in range(n_noise)
+        }
+        X = pd.concat([X, pd.DataFrame(block, index=X.index)], axis=1)
+        cols = [f"f{i}" for i in range(n_noise)]
+        y = pd.DataFrame(
+            {
+                label_col_for(h): (X["RUL"] <= h).astype(int).to_numpy()
+                for h in FAILURE_HORIZONS
+            }
+        )
+        return X, y, cols
+
+    def test_keeps_informative_columns(self):
+        from stattwin.experiments._common import screen_features
+
+        X, y, cols = self._frame()
+        keep = screen_features(X, y, cols, top_k=50, min_keep=30)
+        for informative in ("f0", "f1", "f2", "f3", "f4"):
+            assert informative in keep
+
+    def test_respects_top_k(self):
+        from stattwin.experiments._common import screen_features
+
+        X, y, cols = self._frame()
+        keep = screen_features(X, y, cols, top_k=40, min_keep=10)
+        assert len(keep) <= 40
+
+    def test_no_screening_when_under_budget(self):
+        from stattwin.experiments._common import screen_features
+
+        X, y, cols = self._frame(n_noise=20)
+        keep = screen_features(X, y, cols, top_k=300)
+        assert keep == cols
+
+    def test_always_keeps_raw_sensors(self):
+        from stattwin.experiments._common import screen_features
+
+        X, y, cols = self._frame(n_noise=50)
+        X = X.copy()
+        X["sensor_1"] = X["RUL"] * 0.1 + 500.0
+        X["op_setting_2"] = 1.0  # constant raw column
+        keep = screen_features(X, y, cols + ["sensor_1", "op_setting_2"],
+                               top_k=10, min_keep=5)
+        assert "sensor_1" in keep
+        assert "op_setting_2" in keep
+
+    def test_selection_is_train_only(self):
+        """A feature that only correlates in the validation units must not
+        be promoted by the screen."""
+        from stattwin.experiments._common import screen_features
+
+        X, y, cols = self._frame(n_noise=60)
+        X["spurious"] = 0.0
+        units = sorted(X["unit_id"].unique())
+        val_units = units[-5:]
+        mask = X["unit_id"].isin(val_units)
+        # correlate `spurious` with RUL only on the validation units
+        X.loc[mask, "spurious"] = X.loc[mask, "RUL"].to_numpy() * 10.0
+        train = X[~mask]
+        keep = screen_features(train, y.loc[train.index], cols + ["spurious"],
+                               top_k=8, min_keep=5)
+        assert "spurious" not in keep
+
+    def test_config_switch_respects_disable(self):
+        from stattwin.config import STATTWINConfig
+        from stattwin.experiments._common import resolve_feature_cols
+
+        cfg = STATTWINConfig()
+        cfg.model.feature_screen.enabled = False
+        X, y, cols = self._frame(n_noise=60)
+        assert resolve_feature_cols(cfg, X, y, cols) == cols
+
+    def test_config_switch_uses_top_k(self):
+        from stattwin.config import STATTWINConfig
+        from stattwin.experiments._common import resolve_feature_cols
+
+        cfg = STATTWINConfig()
+        cfg.model.feature_screen.top_k = 20
+        cfg.model.feature_screen.min_keep = 10
+        X, y, cols = self._frame(n_noise=60)
+        assert len(resolve_feature_cols(cfg, X, y, cols)) <= 20
+
+    def test_min_keep_floors_the_screened_count(self):
+        """A tiny ``top_k`` must not gut the model below ``min_keep``."""
+        from stattwin.config import STATTWINConfig
+        from stattwin.experiments._common import resolve_feature_cols
+
+        cfg = STATTWINConfig()
+        cfg.model.feature_screen.top_k = 5
+        cfg.model.feature_screen.min_keep = 40
+        X, y, cols = self._frame(n_noise=60)
+        keep = resolve_feature_cols(cfg, X, y, cols)
+        assert len(keep) >= 40
+
+
+class TestImputeCausal:
+    def test_forward_fills_interior_gaps_within_unit(self):
+        from stattwin.experiments._common import impute_causal
+
+        X = pd.DataFrame(
+            {
+                "unit_id": [1, 1, 1, 2, 2, 2],
+                "f": [1.0, np.nan, 3.0, 5.0, np.nan, 7.0],
+            }
+        )
+        impute_causal([X], ["f"])
+        # interior gaps inherit the previous cycle of the same unit
+        assert X.loc[1, "f"] == 1.0   # unit 1
+        assert X.loc[4, "f"] == 5.0   # unit 2, not unit 1's 1.0
+
+    def test_leading_nan_falls_back_to_column_median(self):
+        from stattwin.experiments._common import impute_causal
+
+        X = pd.DataFrame(
+            {
+                "unit_id": [1, 1, 1, 2, 2],
+                "f": [1.0, 3.0, 5.0, np.nan, 7.0],
+            }
+        )
+        impute_causal([X], ["f"])
+        # unit 2 has no history at its first row -> median of observed
+        # training values (1, 3, 5, 7) = 4.0
+        assert X.loc[3, "f"] == 4.0
+
+    def test_does_not_fill_across_units(self):
+        from stattwin.experiments._common import impute_causal
+
+        X = pd.DataFrame(
+            {"unit_id": [1, 1, 2, 2], "f": [5.0, np.nan, np.nan, 7.0]}
+        )
+        impute_causal([X], ["f"])
+        # unit 1 interior gap inherits 5.0 from its own unit; unit 2's
+        # leading gap has no history, so it takes the column median
+        # (observed values 5, 5, 7 -> 5.0) and never a *sequence* from
+        # unit 1
+        assert X.loc[1, "f"] == 5.0
+        assert X.loc[2, "f"] == 5.0
+
+    def test_all_missing_column_becomes_zero(self):
+        from stattwin.experiments._common import impute_causal
+
+        train = pd.DataFrame({"unit_id": 1, "f": [np.nan, np.nan]})
+        val = pd.DataFrame({"unit_id": 2, "f": [np.nan, 1.0]})
+        impute_causal([train, val], ["f"])
+        assert train["f"].tolist() == [0.0, 0.0]
+        assert val["f"].tolist() == [0.0, 1.0]
+
+    def test_validation_values_never_shape_the_median(self):
+        from stattwin.experiments._common import impute_causal
+
+        # training column is constant at 10.0; validation holds 1000/NaN
+        train = pd.DataFrame({"unit_id": 1, "f": [10.0, 10.0, 10.0]})
+        val = pd.DataFrame({"unit_id": 2, "f": [1000.0, np.nan]})
+        impute_causal([train, val], ["f"])
+        # the val NaN is filled by causal ffill inside unit 2 (1000.0) —
+        # a training *median* would have been 10.0, proving the fill is
+        # row-local and never the val distribution
+        assert val.loc[1, "f"] == 1000.0
+
+    def test_leading_val_nan_uses_training_median(self):
+        from stattwin.experiments._common import impute_causal
+
+        train = pd.DataFrame({"unit_id": 1, "f": [10.0, 20.0, 30.0]})
+        val = pd.DataFrame({"unit_id": 2, "f": [np.nan, 1000.0]})
+        impute_causal([train, val], ["f"])
+        # val unit's FIRST row has no history -> training median (20.0),
+        # never the val mean / any val-derived statistic
+        assert val.loc[0, "f"] == 20.0
+
+    def test_missing_columns_are_ignored(self):
+        from stattwin.experiments._common import impute_causal
+
+        X = pd.DataFrame({"unit_id": [1, 2], "f": [1.0, 2.0]})
+        impute_causal([X], ["f", "not_present"])
+        assert X["f"].tolist() == [1.0, 2.0]
+
+    def test_works_without_unit_column(self):
+        from stattwin.experiments._common import impute_causal
+
+        X = pd.DataFrame({"f": [1.0, np.nan, 3.0]})
+        impute_causal([X], ["f"])
+        # no unit column -> no ffill; the gap takes the column median (2.0)
+        assert X["f"].tolist() == [1.0, 2.0, 3.0]
+
+
+# ---------------------------------------------------------------------------
+# e2 checkpointing / resume
+# ---------------------------------------------------------------------------
+
+
+class TestE2Checkpointing:
+    def test_build_results_marks_partial(self):
+        from stattwin.config import STATTWINConfig
+        from stattwin.experiments.e2_model_comparison import _build_results
+
+        cfg = STATTWINConfig()
+        fp = {"features": "engineered", "feature_screen": {"top_k": 300}}
+        rows = [
+            {
+                "model": "XGBoostModel",
+                "classification": [{"horizon": 30, "roc_auc": 0.9, "f1": 0.5}],
+                "rul": {"rmse": 20.0, "mae": 12.0, "nasa_score": 300.0},
+            }
+        ]
+        partial = _build_results(cfg, fp, rows, partial=True)
+        assert partial["partial"] is True
+        assert partial["summary_table"][0]["rul_rmse"] == 20.0
+        final = _build_results(cfg, fp, rows, partial=False)
+        assert final["partial"] is False
+
+    def test_error_rows_survive_summary(self):
+        from stattwin.config import STATTWINConfig
+        from stattwin.experiments.e2_model_comparison import _build_results
+
+        cfg = STATTWINConfig()
+        out = _build_results(
+            cfg,
+            {"features": "raw", "feature_screen": {}},
+            [{"model": "BrokenModel", "error": "boom"}],
+            partial=True,
+        )
+        assert out["summary_table"] == [{"model": "BrokenModel", "error": "boom"}]
+
+    def test_save_and_read_roundtrip(self, temp_dir):
+        from stattwin.config import STATTWINConfig
+        from stattwin.experiments.e2_model_comparison import (
+            _read_json,
+            _save_results,
+        )
+
+        cfg = STATTWINConfig()
+        fp = {"features": "engineered", "feature_screen": {"top_k": 300}}
+        rows = [
+            {
+                "model": "GRUModel",
+                "classification": [{"horizon": 10, "roc_auc": 0.8, "f1": 0.4}],
+                "rul": {"rmse": 25.0, "mae": 15.0, "nasa_score": 500.0},
+            }
+        ]
+        _save_results(cfg, temp_dir, fp, rows, partial=True)
+        loaded = _read_json(temp_dir / "e2_results.json")
+        assert isinstance(loaded, dict)
+        assert loaded["partial"] is True
+        assert loaded["models"][0]["model"] == "GRUModel"
+        assert loaded["feature_screen"] == {"top_k": 300}
+
+    def test_read_json_missing_and_malformed(self, temp_dir):
+        from stattwin.experiments.e2_model_comparison import _read_json
+
+        assert _read_json(temp_dir / "nope.json") is None
+        bad = temp_dir / "bad.json"
+        bad.write_text("{not json", encoding="utf-8")
+        assert _read_json(bad) is None
+
+
+# ---------------------------------------------------------------------------
 # e9 uncertainty helpers
 # ---------------------------------------------------------------------------
 

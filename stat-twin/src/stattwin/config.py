@@ -143,6 +143,23 @@ class EnsembleCfg(BaseModel):
     val_fraction: float = 0.2
 
 
+class FeatureScreenCfg(BaseModel):
+    """Leakage-safe per-fold feature screening for the engineered library.
+
+    The statistical library produces ~1 100 columns.  Histogram-based
+    boosters and random forests cost roughly linear in feature count, so
+    every experiment that trains on the full library pays a large tax for
+    columns that carry no signal.  Screening keeps the ``top_k`` columns
+    with the strongest training-only association and is refit inside each
+    fold, so no validation unit ever influences the choice.
+    """
+
+    enabled: bool = True
+    top_k: int = 300
+    method: str = "correlation"  # "correlation" | "none"
+    min_keep: int = 30
+
+
 class ModelCfg(BaseModel):
     gru: GRUCfg = Field(default_factory=GRUCfg)
     xgb: XGBCfg = Field(default_factory=XGBCfg)
@@ -150,6 +167,7 @@ class ModelCfg(BaseModel):
     lr: LRCfg = Field(default_factory=LRCfg)
     lstm: LSTMCfg = Field(default_factory=LSTMCfg)
     ensemble: EnsembleCfg = Field(default_factory=EnsembleCfg)
+    feature_screen: FeatureScreenCfg = Field(default_factory=FeatureScreenCfg)
 
 
 class UncertaintyCfg(BaseModel):
