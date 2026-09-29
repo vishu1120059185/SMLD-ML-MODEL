@@ -24,9 +24,11 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+from stattwin.dashboard.components.motion import aurora as _aurora  # noqa: E402
 from stattwin.dashboard.components.theme import inject_css  # noqa: E402
 
 inject_css()
+_aurora()
 
 # ── Sidebar ─────────────────────────────────────────────────────────────────
 RESULTS_DIR = _PROJECT_ROOT / "results"
@@ -53,7 +55,7 @@ PAGE_ICONS = {
 
 st.sidebar.markdown(
     """
-    <div class="side-logo">STAT-TWIN</div>
+    <div class="side-logo sw-shine">STAT-TWIN</div>
     <div class="side-tagline">Digital-Twin Health Intelligence</div>
     """,
     unsafe_allow_html=True,
@@ -155,13 +157,31 @@ st.markdown(
             <div class="st-hero-meta">
                 <span class="st-pill st-pill-accent">{page_code} · {page_label}</span>
                 <span class="st-pill st-pill-success">● {selected_machine}</span>
-                <span class="st-pill st-pill-violet">LIVE 2s</span>
+                <span class="sw-live"><span class="sw-live-dot"></span>LIVE 2s</span>
             </div>
         </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
+
+# ── Telemetry ticker ribbon ─────────────────────────────────────────────────
+try:
+    from stattwin.dashboard.components.motion import ticker as _ticker
+
+    _ticker(
+        [
+            ("result sets", n_results),
+            ("views", len(PAGES)),
+            ("active", selected_machine),
+            ("page", f"{page_code} {page_label}"),
+            ("refresh", "2s live fragments"),
+            ("provenance", "OBSERVED / PREDICTED / SIMULATED"),
+        ],
+        speed="34s",
+    )
+except Exception:  # pragma: no cover - decorative only
+    pass
 
 # ── Dispatch to page module (absolute imports: stattwin.dashboard.views.*) ───
 page_module_path = PAGES[selected_page]

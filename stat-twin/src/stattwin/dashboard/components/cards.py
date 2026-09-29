@@ -1,12 +1,22 @@
 """KPI cards, evidence cards, recommendation cards with provenance badges.
 
 Enhanced with tooltips, provenance variants, freshness indicators,
-alert cards, and loading skeleton support for industrial dark UI.
+alert cards, loading skeleton support, and the motion layer (animated
+entrance reveals, count-up numerals, spotlight hover) for the
+industrial dark UI.
 """
 from __future__ import annotations
 
+import re
+
 import streamlit as st
 
+from stattwin.dashboard.components.motion import (
+    count_up_html,
+)
+from stattwin.dashboard.components.motion import (
+    section_header as motion_section_header,
+)
 from stattwin.dashboard.components.theme import (
     ACCENT,
     BORDER,
@@ -64,6 +74,30 @@ SEVERITY_COLORS = {
     "danger": DANGER,
     "success": SUCCESS,
 }
+
+# A plain number, e.g. "0.9132" or "1,204" or "87" — safe to count up
+_PLAIN_NUMBER = re.compile(r"^-?[\d,]+(?:\.\d+)?$")
+
+
+def _maybe_count_up(value: str | float | int) -> str:
+    """Return animated count-up HTML for plain numeric KPI values.
+
+    Anything non-numeric (e.g. ``"h30"``, ``"3 / 8 units"``) is passed
+    through unchanged, so text KPIs never break.
+    """
+    text = str(value).strip()
+    if not _PLAIN_NUMBER.match(text):
+        return text
+    try:
+        numeric = float(text.replace(",", ""))
+    except ValueError:  # pragma: no cover - regex already guarantees parse
+        return text
+    decimals = len(text.split(".")[1]) if "." in text else 0
+    prefix = "-" if text.startswith("-") else ""
+    if decimals:
+        return count_up_html(numeric, decimals=decimals, prefix=prefix, signed=False)
+    return count_up_html(numeric, decimals=0, prefix=prefix, signed=False)
+
 
 
 def _badge(label: str, bg: str, fg: str = "#FFFFFF") -> str:
@@ -129,16 +163,22 @@ def kpi_card(
     delta_color: str = "normal",
     provenance: str | None = None,
     tooltip: str | None = None,
+    animate: bool = True,
 ):
-    """Render a KPI metric card with optional tooltip and provenance."""
+    """Render a KPI metric card with optional tooltip and provenance.
+
+    Plain numeric values animate with a count-up numeral; pass
+    ``animate=False`` to keep a static (or non-numeric) string.
+    """
     prov_html = f" {provenance_badge(provenance)}" if provenance else ""
     label_html = _tooltip(label) if tooltip else label
     delta_html = f'<div class="st-kpi-delta">{delta}</div>' if delta else ""
+    value_html = _maybe_count_up(value) if animate else str(value)
     st.markdown(
         f"""
         <div class="st-kpi">
             <div class="st-kpi-label">{label_html}{prov_html}</div>
-            <div class="st-kpi-value">{value}</div>
+            <div class="st-kpi-value">{value_html}</div>
             {delta_html}
         </div>
         """,
@@ -278,7 +318,7 @@ def alert_card(
 
 
 def progress_card(label: str, current: float, maximum: float = 100.0, *, suffix: str = ""):
-    """RUL countdown or progress bar card."""
+    """RUL countdown or progress bar card with animated fill + sheen."""
     pct = min(current / maximum, 1.0) if maximum > 0 else 0.0
     bar_color = SUCCESS if pct > 0.5 else WARNING if pct > 0.2 else DANGER
     st.markdown(
@@ -286,6 +326,7 @@ def progress_card(label: str, current: float, maximum: float = 100.0, *, suffix:
         <div style="
             background:{CARD_BG}; border:1px solid {CARD_BORDER}; border-radius:10px;
             padding:14px 18px; margin-bottom:12px; box-shadow:{SHADOW};
+            animation:sw-fade-up .6s cubic-bezier(.16,1,.3,1) both;
         ">
             <div style="font-size:0.72rem; color:{TEXT_SECONDARY}; text-transform:uppercase;
                         letter-spacing:1px; margin-bottom:8px; font-weight:600;">{label}</div>
@@ -293,9 +334,13 @@ def progress_card(label: str, current: float, maximum: float = 100.0, *, suffix:
                         font-family:'JetBrains Mono',monospace; margin-bottom:8px;">
                 {current:.1f}{suffix}
             </div>
-            <div style="background:#1a2236;border-radius:4px;height:6px;overflow:hidden;">
-                <div style="background:{bar_color};width:{pct * 100:.1f}%;height:100%;
-                            border-radius:4px;transition:width 0.3s ease;"></div>
+            <div style="background:#1a2236;border-radius:999px;height:7px;overflow:hidden;
+                        position:relative;">
+                <div style="background:linear-gradient(90deg,{bar_color}aa,{bar_color});
+                            width:{pct * 100:.1f}%; height:100%; border-radius:999px;
+                            transition:width 0.9s cubic-bezier(.16,1,.3,1);
+                            box-shadow:0 0 12px {bar_color}88; position:relative;">
+                </div>
             </div>
         </div>
         """,
@@ -304,15 +349,17 @@ def progress_card(label: str, current: float, maximum: float = 100.0, *, suffix:
 
 
 def disclaimer_banner(text: str = "SIMULATION — not real operational data"):
-    """Persistent simulation disclaimer with violet accent."""
+    """Persistent simulation disclaimer with violet accent + pulse."""
     st.markdown(
         f"""
         <div style="
             background:rgba(139,92,246,0.12); border:1px solid #8B5CF6;
             border-radius:11px; padding:11px 16px; margin-bottom:14px;
             color:{TEXT}; font-size:0.84rem; text-align:center;
-            font-weight:650; letter-spacing:0.3px; box-shadow:{SHADOW};">
-            ⚠ {text}
+            font-weight:650; letter-spacing:0.3px; box-shadow:{SHADOW};
+            animation:sw-fade-up .6s cubic-bezier(.16,1,.3,1) both;
+            position:relative; overflow:hidden;">
+            <span style="opacity:.85;">⚠</span> {text}
         </div>
         """,
         unsafe_allow_html=True,
@@ -320,19 +367,15 @@ def disclaimer_banner(text: str = "SIMULATION — not real operational data"):
 
 
 def section_header(title: str, subtitle: str = ""):
-    """Section header with optional subtitle."""
-    sub_html = f'<span class="st-section-sub">{subtitle}</span>' if subtitle else ""
-    st.markdown(
-        f'<div class="st-section-title"><h3>{title}</h3>{sub_html}</div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown("---")
+    """Section header with optional subtitle (animated accent rule)."""
+    motion_section_header(title, subtitle)
+    st.markdown('<hr class="sw-hr">', unsafe_allow_html=True)
 
 
 def skeleton_card():
     """Loading skeleton placeholder for async data."""
     st.markdown(
-        '<div class="st-skeleton"></div>',
+        '<div class="sw-skel" style="--h:60px;"></div>',
         unsafe_allow_html=True,
     )
 
@@ -345,6 +388,7 @@ def page_header(title: str, subtitle: str = "", machine: str | None = None):
     meta = f" · {' · '.join(meta_bits)}" if meta_bits else ""
     sub = f'<div class="st-page-sub">{subtitle}{meta}</div>' if subtitle or meta else ""
     st.markdown(
-        f'<div class="st-page-title">{title}</div>{sub}',
+        f'<div class="sw-reveal-left">'
+        f'<div class="st-page-title sw-shine">{title}</div>{sub}</div>',
         unsafe_allow_html=True,
     )

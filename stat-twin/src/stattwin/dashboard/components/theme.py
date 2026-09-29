@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import streamlit as st
 
+from stattwin.dashboard.components.motion import MOTION_CSS
+
 # ── Tokens ──────────────────────────────────────────────────────────────────
 BG = "#0A0E17"
 BG_ELEVATED = "#0D1117"
@@ -76,13 +78,14 @@ PLOTLY_LAYOUT = dict(
 
 
 def inject_css() -> None:
-    """Inject the full design-system stylesheet.
+    """Inject the full design-system + motion stylesheets.
 
     Must run on *every* script run: Streamlit rebuilds the DOM on each
     rerun (page switch, widget change), so a once-per-session guard would
     strip the theme after the first interaction.
     """
     st.markdown(_CSS, unsafe_allow_html=True)
+    st.markdown(MOTION_CSS, unsafe_allow_html=True)
 
 
 _FONT_IMPORT = (
@@ -120,12 +123,13 @@ _CSS = f"""
 /* ── Global shell ─────────────────────────────────────────────────────── */
 .stApp {{
   background:
-    radial-gradient(1200px 520px at 88% -8%, rgba(59,130,246,0.07), transparent 58%),
-    radial-gradient(900px 480px at -8% 108%, rgba(16,185,129,0.045), transparent 55%),
-    radial-gradient(700px 400px at 50% 50%, rgba(139,92,246,0.025), transparent 70%),
+    radial-gradient(1200px 520px at 88% -8%, rgba(59,130,246,0.10), transparent 58%),
+    radial-gradient(900px 480px at -8% 108%, rgba(16,185,129,0.06), transparent 55%),
+    radial-gradient(700px 400px at 50% 50%, rgba(139,92,246,0.035), transparent 70%),
     var(--bg);
   color: var(--text);
   font-family: var(--sans);
+  background-attachment: fixed;
 }}
 html, body, [class*="css"], [data-testid="stAppViewContainer"], [data-testid="stSidebar"] {{
   font-family: var(--sans);
@@ -252,11 +256,20 @@ div[data-testid="stRadio"] label:has(input:checked) {{
   padding: 18px 24px; margin-bottom: 1rem;
   box-shadow: var(--shadow-lg);
   position: relative; overflow: hidden;
+  animation: sw-fade-up .7s cubic-bezier(.16,1,.3,1) both;
+}}
+.st-hero::before {{
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(96,165,250,.85),
+              rgba(16,185,129,.6), transparent);
+  animation: sw-rail-slide 4.5s linear infinite;
+  background-size: 300% 100%;
 }}
 .st-hero::after {{
   content: ""; position: absolute; top: -40%; right: -10%; width: 280px; height: 280px;
-  background: radial-gradient(circle, rgba(59,130,246,0.12), transparent 65%);
+  background: radial-gradient(circle, rgba(59,130,246,0.16), transparent 65%);
   pointer-events: none;
+  animation: sw-drift-a 18s cubic-bezier(.65,0,.35,1) infinite;
 }}
 .st-hero-row {{
   display: flex; align-items: center; justify-content: space-between;
@@ -266,6 +279,8 @@ div[data-testid="stRadio"] label:has(input:checked) {{
   font-size: 1.55rem; font-weight: 800; letter-spacing: 4.5px; line-height: 1.1;
   background: linear-gradient(90deg, #93C5FD 0%, #3B82F6 48%, #10B981 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
+  background-size: 220% 100%;
+  animation: sw-shine 8s linear infinite;
 }}
 .st-hero-sub {{
   color: var(--muted); font-size: 0.7rem; text-transform: uppercase;
@@ -396,9 +411,15 @@ details summary, [data-testid="stExpander"] summary {{
   border: 1px solid var(--border); border-radius: 12px;
   padding: 15px 18px; box-shadow: var(--shadow);
   transition: border-color 0.15s ease, transform 0.12s ease;
-  height: 100%;
+  height: 100%; position: relative; overflow: hidden;
 }}
-.st-kpi:hover {{ border-color: #2B3A4F; transform: translateY(-1px); }}
+.st-kpi::after {{
+  content: ""; position: absolute; inset: -1px; border-radius: inherit;
+  pointer-events: none; opacity: 0; transition: opacity 0.28s ease;
+  background: radial-gradient(360px circle at 50% 0%, rgba(96,165,250,.15), transparent 62%);
+}}
+.st-kpi:hover {{ border-color: #2B3A4F; transform: translateY(-3px); }}
+.st-kpi:hover::after {{ opacity: 1; }}
 .st-kpi-label {{
   font-size: 0.68rem; color: var(--muted); text-transform: uppercase;
   letter-spacing: 1.2px; margin-bottom: 7px; font-weight: 650;
@@ -421,6 +442,12 @@ details summary, [data-testid="stExpander"] summary {{
   background: var(--card); border: 1px solid var(--border);
   border-radius: 12px; padding: 14px 18px; margin-bottom: 12px;
   box-shadow: var(--shadow);
+  position: relative; overflow: hidden;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}}
+.st-card:hover {{
+  border-color: rgba(96,165,250,.32);
+  transform: translateX(2px);
 }}
 .st-section-title {{
   display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
